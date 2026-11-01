@@ -11,6 +11,8 @@ export interface RunSession {
   currentPaceSecondsPerKm: number;
   route: Coordinates[];
   territoriesClaimedCount: number;
+  territoryCapturedKm2: number;
+  xpEarned: number;
   caloriesBurned: number;
   status: RunStatus;
 }

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { ThemedText } from './ThemedText';
+import { Icon } from './Icon';
 
 export interface BottomSheetProps {
   visible: boolean;
@@ -99,7 +100,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   style={styles.closeButton}
                   hitSlop={8}
                 >
-                  <X size={18} color={Colors.textSecondary} strokeWidth={2.2} />
+                  <Icon icon={X} size={18} color={Colors.textSecondary} strokeWidth={2.2} />
                 </Pressable>
               ) : null}
             </View>

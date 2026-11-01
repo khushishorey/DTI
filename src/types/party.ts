@@ -25,4 +25,14 @@ export interface Party {
   hostId: string;
   participants: PartyParticipant[];
   createdAt: string;
+  startedAt?: number;
+  endsAt?: number;
+}
+
+export interface CreatePartyInput {
+  name: string;
+  visibility: PartyVisibility;
+  gameMode: PartyGameMode;
+  durationMinutes: number;
+  maxParticipants: number;
 }

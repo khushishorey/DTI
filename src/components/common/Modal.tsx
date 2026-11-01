@@ -14,6 +14,7 @@ import { X } from 'lucide-react-native';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { ThemedText } from './ThemedText';
 import { Button, ButtonVariant } from './Button';
+import { Icon } from './Icon';
 
 export interface ModalAction {
   label: string;
@@ -88,7 +89,7 @@ export const Modal: React.FC<ModalProps> = ({
                         style={styles.closeButton}
                         hitSlop={8}
                       >
-                        <X size={20} color={Colors.textSecondary} strokeWidth={2.2} />
+                        <Icon icon={X} size={20} color={Colors.textSecondary} strokeWidth={2.2} />
                       </Pressable>
                     ) : null}
                   </View>

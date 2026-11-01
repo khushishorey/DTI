@@ -3,7 +3,6 @@ import {
   View,
   TextInput,
   TextInputProps,
-  TextInputInstance,
   StyleSheet,
   Pressable,
   ViewStyle,
@@ -12,6 +11,7 @@ import {
 import { X } from 'lucide-react-native';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { ThemedText } from './ThemedText';
+import { Icon } from './Icon';
 
 export interface InputProps extends TextInputProps {
   label?: string;
@@ -25,7 +25,7 @@ export interface InputProps extends TextInputProps {
   inputContainerStyle?: StyleProp<ViewStyle>;
 }
 
-export const Input = React.forwardRef<TextInputInstance, InputProps>(
+export const Input = React.forwardRef<React.ElementRef<typeof TextInput>, InputProps>(
   (
     {
       label,
@@ -99,7 +99,7 @@ export const Input = React.forwardRef<TextInputInstance, InputProps>(
               style={styles.clearButton}
               hitSlop={8}
             >
-              <X size={16} color={Colors.textSecondary} strokeWidth={2.5} />
+              <Icon icon={X} size={16} color={Colors.textSecondary} strokeWidth={2.5} />
             </Pressable>
           ) : null}
 

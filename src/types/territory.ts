@@ -4,6 +4,7 @@ export interface Coordinates {
 }
 
 export type TerritoryViewMode = 'territory' | 'grid';
+export type TerritoryStatus = 'owned' | 'unclaimed' | 'contested';
 
 export interface Territory {
   id: string;
@@ -15,6 +16,7 @@ export interface Territory {
   areaKm2: number;
   capturedAt: string;
   coordinates: Coordinates[];
+  status?: TerritoryStatus;
 }
 
 export interface HexCell {

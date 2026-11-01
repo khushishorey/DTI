@@ -1,2 +1,3 @@
-// Leaderboard components (RankRow, CategoryTabs, PodiumView)
-export {};
+export * from './LeaderboardCategoryTabs';
+export * from './LeaderboardEntryRow';
+export * from './LeaderboardPodium';

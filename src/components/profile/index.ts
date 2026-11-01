@@ -1,2 +1,3 @@
-// Profile components (StatOverview, AchievementBadge, ActivityHistoryCard)
-export {};
+export * from './ProfileStatCard';
+export * from './AchievementCard';
+export * from './ActivityHistoryRow';

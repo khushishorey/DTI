@@ -7,4 +7,5 @@ export * from './Avatar';
 export * from './Modal';
 export * from './BottomSheet';
 export * from './BottomNavBar';
+export * from './AppBottomNavigation';
 export * from './Icon';

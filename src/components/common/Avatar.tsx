@@ -4,6 +4,7 @@ import { Image, ImageSource } from 'expo-image';
 import { User } from 'lucide-react-native';
 import { Colors, Radius, Typography } from '../../constants/theme';
 import { ThemedText } from './ThemedText';
+import { Icon } from './Icon';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type AvatarStatus = 'online' | 'running' | 'offline';
@@ -95,7 +96,8 @@ export const Avatar: React.FC<AvatarProps> = ({
             { width: dimension, height: dimension, borderRadius },
           ]}
         >
-          <User
+          <Icon
+            icon={User}
             size={Math.round(dimension * 0.55)}
             color={Colors.textSecondary}
             strokeWidth={2}

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, IconSizes, Radius, Spacing, Typography } from '../../constants/theme';
 import { ThemedText } from './ThemedText';
+import { Icon } from './Icon';
 
 export type NavTabKey = 'home' | 'explore' | 'parties' | 'leaderboard' | 'profile';
 
@@ -24,7 +25,7 @@ export const DEFAULT_NAV_TABS: TabItemConfig[] = [
   { key: 'home', label: 'Home', icon: MapPin },
   { key: 'explore', label: 'Explore', icon: Compass },
   { key: 'parties', label: 'Parties', icon: Users },
-  { key: 'leaderboard', label: 'Ranks', icon: Trophy },
+  { key: 'leaderboard', label: 'Leaderboard', icon: Trophy },
   { key: 'profile', label: 'Profile', icon: User },
 ];
 
@@ -79,7 +80,8 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
               <View style={[styles.indicator, isActive && styles.indicatorActive]} />
 
               <View style={styles.iconWrapper}>
-                <IconComponent
+                <Icon
+                  icon={IconComponent}
                   size={IconSizes.md}
                   color={isActive ? Colors.primary : Colors.textSecondary}
                   strokeWidth={isActive ? 2.4 : 2}
