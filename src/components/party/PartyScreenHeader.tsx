@@ -6,18 +6,30 @@ import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { Icon } from '../common/Icon';
 import { ThemedText } from '../common/ThemedText';
 
-export function PartyScreenHeader({ title, subtitle, backTo }: { title: string; subtitle?: string; backTo?: Href }) {
-  const handleBack = () => backTo ? router.replace(backTo) : router.back();
+export function PartyScreenHeader({
+  title,
+  subtitle,
+  backTo,
+  showBack = true,
+}: {
+  title: string;
+  subtitle?: string;
+  backTo?: Href;
+  showBack?: boolean;
+}) {
+  const handleBack = () => (backTo ? router.replace(backTo) : router.back());
   return (
     <View style={styles.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={handleBack} style={styles.backButton}>
-        <Icon icon={ArrowLeft} size={19} color={Colors.textPrimary} strokeWidth={2.4} />
-      </Pressable>
+      {showBack ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={handleBack} style={styles.backButton}>
+          <Icon icon={ArrowLeft} size={19} color={Colors.textPrimary} strokeWidth={2.4} />
+        </Pressable>
+      ) : null}
       <View style={styles.copy}>
         <ThemedText style={styles.title}>{title}</ThemedText>
         {subtitle ? <ThemedText style={styles.subtitle}>{subtitle}</ThemedText> : null}
       </View>
-      <View style={styles.rightSpacer} />
+      {showBack ? <View style={styles.rightSpacer} /> : null}
     </View>
   );
 }

@@ -55,6 +55,9 @@ export default function ExploreScreen() {
   const centerOnLocation = () => {
     setCenterOnLocationKey((value) => value + 1);
     setCenterMessage(true);
+    setTimeout(() => {
+      setCenterMessage(false);
+    }, 2500);
   };
 
   const openOwnerProfile = () => {
@@ -238,25 +241,25 @@ const styles = StyleSheet.create({
   mapLegend: { position: 'absolute', left: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: 'rgba(20, 27, 24, 0.94)', borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 3 },
-  legendText: { color: Colors.textSecondary, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.5 },
+  legendText: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.5 },
   mapActions: { position: 'absolute', right: Spacing.lg, alignItems: 'flex-end', gap: Spacing.xs },
   locationButton: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
   locationButtonPressed: { backgroundColor: Colors.primaryMuted, borderColor: Colors.primary },
-  centerMessage: { color: Colors.textPrimary, backgroundColor: Colors.surface, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.sm, overflow: 'hidden', fontSize: 10 },
+  centerMessage: { color: Colors.textPrimary, backgroundColor: Colors.surface, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.sm, overflow: 'hidden', fontSize: 11 },
   noResults: { position: 'absolute', alignSelf: 'center', top: '52%', alignItems: 'center', padding: Spacing.lg, borderRadius: Radius.lg, backgroundColor: 'rgba(20, 27, 24, 0.94)', borderWidth: 1, borderColor: Colors.border },
   noResultsTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold },
   noResultsText: { color: Colors.textSecondary, fontSize: Typography.sizes.xs, marginTop: 3 },
   sheetContent: { gap: Spacing.lg },
   ownerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   ownerCopy: { flex: 1 },
-  ownerLabel: { color: Colors.textSecondary, fontSize: 9, fontWeight: Typography.weights.bold, letterSpacing: 0.8 },
+  ownerLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.8 },
   ownerName: { color: Colors.textPrimary, fontSize: Typography.sizes.base, fontWeight: Typography.weights.semibold, marginTop: 2 },
   ownerLevel: { color: Colors.textSecondary, fontSize: Typography.sizes.xs, marginTop: 2 },
   statusPill: { borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 6 },
-  statusText: { fontSize: 9, fontWeight: Typography.weights.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statusText: { fontSize: 11, fontWeight: Typography.weights.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   detailRow: { flexDirection: 'row', gap: Spacing.sm },
   detailCard: { flex: 1, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surfaceElevated },
   detailValue: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.bold },
-  detailLabel: { color: Colors.textSecondary, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: 4 },
+  detailLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: 4 },
   profileButton: { minHeight: 48 },
 });

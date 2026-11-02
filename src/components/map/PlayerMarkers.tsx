@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xs + 2,
     paddingVertical: 2,
     color: Colors.textPrimary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: Typography.weights.semibold,
   },
   currentMarker: {

@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   },
   subline: {
     color: Colors.textSecondary,
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 3,
   },
   scoreBlock: {
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     color: Colors.textMuted,
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.7,
   },

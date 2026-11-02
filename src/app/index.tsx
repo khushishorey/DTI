@@ -82,7 +82,12 @@ export default function Index() {
             </View>
           </Card>
 
-          <View style={styles.nearbyCard}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${MOCK_NEARBY_PLAYERS.length} nearby runners. Tap to explore.`}
+            onPress={() => router.push('/explore')}
+            style={({ pressed }) => [styles.nearbyCard, pressed && styles.pressed]}
+          >
             <View style={styles.nearbyHeader}>
               <View style={styles.onlineDot} />
               <ThemedText style={styles.nearbyTitle}>NEARBY</ThemedText>
@@ -97,23 +102,29 @@ export default function Index() {
               ))}
             </View>
             <ThemedText style={styles.nearbySubtext}>IN YOUR ZONE</ThemedText>
-          </View>
+          </Pressable>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerPills}>
           {MOCK_NEARBY_PLAYERS.map((player) => (
-            <View key={player.id} style={styles.playerPill}>
+            <Pressable
+              key={player.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Runner ${player.username}, ${formatDistance(player.distanceFromUserMeters)} away`}
+              onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.id } })}
+              style={({ pressed }) => [styles.playerPill, pressed && styles.pressed]}
+            >
               <View style={[styles.playerPillDot, { backgroundColor: player.territoryColor }]} />
               <ThemedText style={styles.playerPillName}>{player.username}</ThemedText>
               <ThemedText style={styles.playerDistance}>{formatDistance(player.distanceFromUserMeters)}</ThemedText>
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
-      </View>
 
-      <View style={[styles.mapHint, { top: insets.top + 198 }]} pointerEvents="none">
-        <View style={styles.mapHintDot} />
-        <ThemedText style={styles.mapHintText}>TAP A TERRITORY TO INSPECT</ThemedText>
+        <View style={styles.mapHint} pointerEvents="none">
+          <View style={styles.mapHintDot} />
+          <ThemedText style={styles.mapHintText}>TAP A TERRITORY TO INSPECT</ThemedText>
+        </View>
       </View>
 
       <View style={[styles.bottomOverlay, { bottom: insets.bottom + 88 }]} pointerEvents="box-none">
@@ -158,12 +169,27 @@ export default function Index() {
         showCloseButton
       >
         {selectedTerritory ? (
-          <View style={styles.territoryDetails}>
-            <View style={[styles.ownerSwatch, { backgroundColor: selectedTerritory.ownerColor }]} />
-            <View style={styles.territoryDetailText}>
-              <ThemedText style={styles.territoryArea}>{selectedTerritory.areaKm2.toFixed(3)} km²</ThemedText>
-              <ThemedText variant="caption">Captured {formatDate(selectedTerritory.capturedAt)}</ThemedText>
+          <View style={styles.territorySheetContent}>
+            <View style={styles.territoryDetails}>
+              <View style={[styles.ownerSwatch, { backgroundColor: selectedTerritory.ownerColor }]} />
+              <View style={styles.territoryDetailText}>
+                <ThemedText style={styles.territoryArea}>{selectedTerritory.areaKm2.toFixed(3)} km²</ThemedText>
+                <ThemedText variant="caption">Captured {formatDate(selectedTerritory.capturedAt)}</ThemedText>
+              </View>
             </View>
+            {!selectedTerritory.isCurrentPlayer && selectedTerritory.ownerId ? (
+              <Button
+                title="VIEW RUNNER PROFILE"
+                variant="secondary"
+                fullWidth
+                onPress={() => {
+                  const ownerId = selectedTerritory.ownerId;
+                  setSelectedTerritory(null);
+                  router.push({ pathname: '/player/[id]', params: { id: ownerId } });
+                }}
+                style={styles.sheetButton}
+              />
+            ) : null}
           </View>
         ) : null}
       </BottomSheet>
@@ -223,7 +249,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     color: Colors.textSecondary,
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     fontWeight: Typography.weights.bold,
   },
@@ -241,7 +267,7 @@ const styles = StyleSheet.create({
   },
   partyButtonText: {
     color: Colors.textPrimary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.7,
   },
@@ -294,7 +320,7 @@ const styles = StyleSheet.create({
   },
   statUnit: {
     color: Colors.textSecondary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.7,
     marginTop: 3,
@@ -317,7 +343,7 @@ const styles = StyleSheet.create({
   },
   statSecondaryLabel: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.5,
     marginTop: 3,
@@ -345,14 +371,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   nearbyTitle: {
-    fontSize: 9,
+    fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },
   nearbyCount: {
     color: Colors.primary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
   },
   nearbyAvatars: {
@@ -374,7 +400,7 @@ const styles = StyleSheet.create({
   },
   nearbySubtext: {
     color: Colors.textMuted,
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.7,
     marginTop: 4,
@@ -384,7 +410,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
   },
   playerPill: {
-    minHeight: 28,
+    minHeight: 30,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -394,32 +420,38 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
   },
+  playerPillPressed: {
+    backgroundColor: Colors.surfaceHighlight,
+    borderColor: Colors.primary,
+  },
   playerPillDot: {
     width: 6,
     height: 6,
     borderRadius: Radius.full,
   },
   playerPillName: {
-    maxWidth: 88,
+    maxWidth: 96,
     color: Colors.textPrimary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: Typography.weights.semibold,
   },
   playerDistance: {
     color: Colors.textSecondary,
-    fontSize: 9,
+    fontSize: 11,
     fontVariant: ['tabular-nums'],
   },
   mapHint: {
-    position: 'absolute',
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(11, 15, 14, 0.78)',
+    backgroundColor: 'rgba(11, 15, 14, 0.88)',
     borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 5,
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
   },
   mapHintDot: {
     width: 5,
@@ -429,7 +461,7 @@ const styles = StyleSheet.create({
   },
   mapHintText: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: Typography.weights.bold,
   },
@@ -464,7 +496,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.6,
   },
@@ -484,10 +516,14 @@ const styles = StyleSheet.create({
   },
   runCaption: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 1.1,
     fontWeight: Typography.weights.bold,
     marginTop: Spacing.sm,
+  },
+  territorySheetContent: {
+    gap: Spacing.md,
+    paddingBottom: Spacing.xs,
   },
   territoryDetails: {
     flexDirection: 'row',
@@ -507,5 +543,8 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+  },
+  sheetButton: {
+    minHeight: 46,
   },
 });

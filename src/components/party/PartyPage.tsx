@@ -1,19 +1,35 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../constants/theme';
 
-export function PartyPage({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
+export function PartyPage({
+  children,
+  scroll = true,
+  hasBottomNav = false,
+  contentContainerStyle,
+}: {
+  children: React.ReactNode;
+  scroll?: boolean;
+  hasBottomNav?: boolean;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+}) {
   const insets = useSafeAreaInsets();
-  const contentStyle = [styles.content, { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }];
+  const bottomPadding = hasBottomNav ? insets.bottom + 104 : insets.bottom + Spacing.xl;
+  const combinedContentStyle = [
+    styles.content,
+    { paddingTop: insets.top + Spacing.lg, paddingBottom: bottomPadding },
+    contentContainerStyle,
+  ];
+
   return (
     <View style={styles.screen}>
       {scroll ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={contentStyle}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={combinedContentStyle}>
           {children}
         </ScrollView>
       ) : (
-        <View style={contentStyle}>{children}</View>
+        <View style={combinedContentStyle}>{children}</View>
       )}
     </View>
   );

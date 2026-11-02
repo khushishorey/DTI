@@ -106,7 +106,6 @@ export default function RunScreen() {
             title={isPaused ? 'RESUME' : 'PAUSE'}
             variant="secondary"
             size="lg"
-            fullWidth
             leftIcon={<Icon icon={isPaused ? Play : Pause} size={18} color={Colors.primary} strokeWidth={2.7} />}
             onPress={isPaused ? resumeRun : pauseRun}
             accessibilityHint={isPaused ? 'Resume your simulated run' : 'Pause your simulated run'}
@@ -116,7 +115,6 @@ export default function RunScreen() {
             title="END RUN"
             variant="destructive"
             size="lg"
-            fullWidth
             leftIcon={<Icon icon={Square} size={15} color={Colors.textPrimary} strokeWidth={2.2} />}
             onPress={() => setShowEndConfirmation(true)}
             style={styles.endButton}
@@ -210,7 +208,7 @@ const styles = StyleSheet.create({
   },
   liveText: {
     color: Colors.textPrimary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 1,
   },
@@ -227,7 +225,7 @@ const styles = StyleSheet.create({
   },
   gpsText: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.7,
   },
@@ -243,7 +241,7 @@ const styles = StyleSheet.create({
   },
   durationLabel: {
     color: Colors.textSecondary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 1.5,
   },
@@ -271,7 +269,7 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },
@@ -289,7 +287,7 @@ const styles = StyleSheet.create({
   },
   metricUnit: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
   },
   bottomPanel: {
@@ -335,7 +333,7 @@ const styles = StyleSheet.create({
   },
   captureLabel: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 0.7,
     fontWeight: Typography.weights.bold,
   },
@@ -346,11 +344,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   captureProgressWrap: {
-    width: 84,
+    width: 90,
   },
   capturePercent: {
     color: Colors.primary,
-    fontSize: 7,
+    fontSize: 11,
     letterSpacing: 0.5,
     fontWeight: Typography.weights.bold,
     textAlign: 'right',
@@ -382,8 +380,8 @@ const styles = StyleSheet.create({
   },
   runningHint: {
     color: Colors.textMuted,
-    fontSize: 8,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 16,
     letterSpacing: 0.8,
     fontWeight: Typography.weights.bold,
     textAlign: 'center',

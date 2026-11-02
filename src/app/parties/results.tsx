@@ -9,10 +9,11 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { Icon } from '../../components/common/Icon';
 import { ThemedText } from '../../components/common/ThemedText';
+import { Avatar } from '../../components/common/Avatar';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { usePartyStore } from '../../stores/usePartyStore';
 
-const PODIUM_COLORS = [Colors.primary, '#BEC8C1', Colors.competitorOrange];
+const PODIUM_COLORS = [Colors.primary, Colors.textSecondary, Colors.competitorOrange];
 
 export default function PartyResultsScreen() {
   const party = usePartyStore((state) => state.activeParty);
@@ -44,9 +45,12 @@ export default function PartyResultsScreen() {
         <View style={styles.podium}>
           {podium.map((participant, index) => participant ? (
             <View key={participant.id} style={[styles.podiumPlace, index === 1 && styles.podiumFirst]}>
-              <View style={[styles.podiumAvatar, { borderColor: PODIUM_COLORS[index], backgroundColor: `${PODIUM_COLORS[index]}22` }]}>
-                <ThemedText style={[styles.podiumInitial, { color: PODIUM_COLORS[index] }]}>{participant.username.slice(0, 1).toUpperCase()}</ThemedText>
-              </View>
+              <Avatar
+                name={participant.username}
+                size={48}
+                borderColor={PODIUM_COLORS[index]}
+                borderWidth={2}
+              />
               <ThemedText style={styles.podiumUsername} numberOfLines={1}>{participant.username}</ThemedText>
               <ThemedText style={[styles.podiumScore, { color: PODIUM_COLORS[index] }]}>{participant.score.toLocaleString()}</ThemedText>
               <View style={[styles.podiumBlock, { height: index === 1 ? 72 : index === 0 ? 54 : 42, borderColor: `${PODIUM_COLORS[index]}50` }]}>
@@ -91,25 +95,25 @@ function ResultStat({ icon, value, label }: { icon: typeof Users; value: string;
 const styles = StyleSheet.create({
   resultHero: { alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.xl },
   trophyMark: { width: 52, height: 52, borderRadius: Radius.full, backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md },
-  eyebrow: { color: Colors.textSecondary, fontSize: 8, letterSpacing: 1.4, fontWeight: Typography.weights.bold },
+  eyebrow: { color: Colors.textSecondary, fontSize: 11, letterSpacing: 1.4, fontWeight: Typography.weights.bold },
   winnerName: { color: Colors.textPrimary, fontSize: Typography.sizes.xxl, lineHeight: 30, fontWeight: Typography.weights.bold, marginTop: Spacing.xs },
-  winnerCaption: { color: Colors.primary, fontSize: 8, letterSpacing: 1, fontWeight: Typography.weights.bold, marginTop: 3 },
+  winnerCaption: { color: Colors.primary, fontSize: 11, letterSpacing: 1, fontWeight: Typography.weights.bold, marginTop: 3 },
   podium: { width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', marginTop: Spacing.xl },
   podiumPlace: { width: '31%', alignItems: 'center' },
   podiumFirst: { marginBottom: 8 },
   podiumAvatar: { width: 48, height: 48, borderRadius: Radius.full, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   podiumInitial: { fontSize: Typography.sizes.lg, fontWeight: Typography.weights.bold },
-  podiumUsername: { maxWidth: 90, color: Colors.textPrimary, fontSize: 9, fontWeight: Typography.weights.semibold, marginTop: 6 },
-  podiumScore: { fontSize: 10, fontWeight: Typography.weights.bold, marginTop: 2, fontVariant: ['tabular-nums'] },
+  podiumUsername: { maxWidth: 90, color: Colors.textPrimary, fontSize: 12, fontWeight: Typography.weights.semibold, marginTop: 6 },
+  podiumScore: { fontSize: 12, fontWeight: Typography.weights.bold, marginTop: 2, fontVariant: ['tabular-nums'] },
   podiumBlock: { width: '86%', backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: Radius.md, borderTopRightRadius: Radius.md, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xs },
   podiumRank: { fontSize: Typography.sizes.lg, fontWeight: Typography.weights.bold },
   statsRow: { flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.md },
   statCard: { flex: 1, alignItems: 'center', paddingHorizontal: Spacing.xs, backgroundColor: Colors.surface },
   statValue: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.bold, marginTop: Spacing.xs, fontVariant: ['tabular-nums'] },
-  statLabel: { color: Colors.textMuted, fontSize: 7, textAlign: 'center', fontWeight: Typography.weights.bold, letterSpacing: 0.5, marginTop: 2 },
+  statLabel: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', fontWeight: Typography.weights.bold, letterSpacing: 0.5, marginTop: 2 },
   standingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xl, marginBottom: Spacing.sm },
   standingsTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.base, fontWeight: Typography.weights.semibold },
-  pointsLabel: { color: Colors.textMuted, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.7 },
+  pointsLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.7 },
   standingsList: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, paddingHorizontal: Spacing.md },
   backButton: { marginTop: Spacing.lg },
 });

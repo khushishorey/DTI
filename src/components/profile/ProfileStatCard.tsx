@@ -23,8 +23,8 @@ export function ProfileStatCard({ label, value, unit, icon }: {
 const styles = StyleSheet.create({
   card: { flexGrow: 1, width: '47%', minHeight: 88, padding: Spacing.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label: { color: Colors.textSecondary, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.7 },
+  label: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.7 },
   valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: Spacing.sm },
   value: { color: Colors.textPrimary, fontSize: Typography.sizes.xl, lineHeight: 26, fontWeight: Typography.weights.bold, fontVariant: ['tabular-nums'] },
-  unit: { color: Colors.textSecondary, fontSize: 9, fontWeight: Typography.weights.semibold },
+  unit: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.semibold },
 });

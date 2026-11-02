@@ -27,9 +27,9 @@ const styles = StyleSheet.create({
   iconWrap: { width: 40, height: 40, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   iconUnlocked: { backgroundColor: Colors.primaryMuted },
   iconLocked: { backgroundColor: Colors.surfaceElevated },
-  name: { color: Colors.textPrimary, fontSize: 11, fontWeight: Typography.weights.bold, marginTop: Spacing.sm },
-  description: { color: Colors.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4, minHeight: 28 },
+  name: { color: Colors.textPrimary, fontSize: 12, fontWeight: Typography.weights.bold, marginTop: Spacing.sm },
+  description: { color: Colors.textSecondary, fontSize: 11, lineHeight: 15, marginTop: 4, minHeight: 30 },
   lockedText: { color: Colors.textMuted },
-  progress: { color: Colors.textSecondary, fontSize: 8, fontWeight: Typography.weights.bold, marginTop: Spacing.sm },
-  unlockedLabel: { color: Colors.primary, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: Spacing.sm },
+  progress: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, marginTop: Spacing.sm },
+  unlockedLabel: { color: Colors.primary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: Spacing.sm },
 });

@@ -23,10 +23,18 @@ export default function PlayerProfileScreen() {
   const playerTerritories = MOCK_EXPLORE_TERRITORIES.filter((territory) => territory.ownerId === id);
   const capturedArea = playerTerritories.reduce((total, territory) => total + territory.areaKm2, 0);
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/explore');
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + 106 }]}>
-        <Button title="BACK TO EXPLORE" variant="ghost" leftIcon={<Icon icon={ArrowLeft} size={17} color={Colors.textPrimary} />} onPress={() => router.replace('/explore')} style={styles.backButton} />
+        <Button title="BACK" variant="ghost" leftIcon={<Icon icon={ArrowLeft} size={17} color={Colors.textPrimary} />} onPress={handleBack} style={styles.backButton} />
 
         <View style={styles.profileCard}>
           <View style={styles.avatarWrap}>
@@ -98,7 +106,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
   statCard: { flex: 1, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   statValue: { color: Colors.textPrimary, fontSize: Typography.sizes.lg, fontWeight: Typography.weights.bold, marginTop: Spacing.sm, fontVariant: ['tabular-nums'] },
-  statLabel: { color: Colors.textSecondary, fontSize: 8, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: 3 },
+  statLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.6, marginTop: 3 },
   territoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm },
   territorySwatch: { width: 10, height: 34, borderRadius: Radius.full },
   territoryCopy: { flex: 1 },

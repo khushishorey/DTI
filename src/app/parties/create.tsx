@@ -127,11 +127,11 @@ export default function CreatePartyScreen() {
           <ThemedText style={styles.playerStepTitle}>Party size</ThemedText>
           <ThemedText style={styles.playerStepSubtitle}>2–32 players</ThemedText>
         </View>
-        <Pressable onPress={() => setMaxParticipants((value) => Math.max(2, value - 1))} style={styles.stepButton} accessibilityLabel="Decrease maximum players">
+        <Pressable onPress={() => setMaxParticipants((value) => Math.max(2, value - 1))} style={styles.stepButton} hitSlop={8} accessibilityLabel="Decrease maximum players">
           <ThemedText style={styles.stepButtonText}>−</ThemedText>
         </Pressable>
         <ThemedText style={styles.playerCount}>{maxParticipants}</ThemedText>
-        <Pressable onPress={() => setMaxParticipants((value) => Math.min(32, value + 1))} style={styles.stepButton} accessibilityLabel="Increase maximum players">
+        <Pressable onPress={() => setMaxParticipants((value) => Math.min(32, value + 1))} style={styles.stepButton} hitSlop={8} accessibilityLabel="Increase maximum players">
           <ThemedText style={styles.stepButtonText}>+</ThemedText>
         </Pressable>
       </View>
@@ -175,12 +175,12 @@ function VisibilityOption({ selected, title, subtitle, icon, onPress }: {
 const styles = StyleSheet.create({
   sectionTitle: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   sectionHeading: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold },
-  sectionSubtitle: { color: Colors.textSecondary, fontSize: 10, marginTop: 3 },
+  sectionSubtitle: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },
   visibilityRow: { flexDirection: 'row', gap: Spacing.sm },
   visibilityOption: { flex: 1, padding: Spacing.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg },
   visibilitySelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
   visibilityTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.xs, fontWeight: Typography.weights.bold, marginTop: Spacing.sm },
-  visibilitySubtitle: { color: Colors.textSecondary, fontSize: 9, marginTop: 2 },
+  visibilitySubtitle: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
   selectedText: { color: Colors.primary },
   modeList: { gap: Spacing.xs },
   modeOption: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg },
@@ -189,19 +189,19 @@ const styles = StyleSheet.create({
   modeIconSelected: { backgroundColor: Colors.primaryMuted },
   modeCopy: { flex: 1 },
   modeName: { color: Colors.textPrimary, fontSize: Typography.sizes.xs, fontWeight: Typography.weights.semibold },
-  modeDescription: { color: Colors.textSecondary, fontSize: 10, marginTop: 2 },
+  modeDescription: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
   radio: { width: 18, height: 18, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.textMuted, alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: Colors.primary },
   radioDot: { width: 8, height: 8, borderRadius: Radius.full, backgroundColor: Colors.primary },
   durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.md },
   durationChip: { minWidth: '31%', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm + 2, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md },
   durationChipSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-  durationText: { color: Colors.textSecondary, fontSize: 10, fontWeight: Typography.weights.semibold },
+  durationText: { color: Colors.textSecondary, fontSize: 12, fontWeight: Typography.weights.semibold },
   playerStepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md },
   playerStepIcon: { width: 36, height: 36, borderRadius: Radius.md, backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
   playerStepCopy: { flex: 1 },
   playerStepTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.xs, fontWeight: Typography.weights.semibold },
-  playerStepSubtitle: { color: Colors.textSecondary, fontSize: 9, marginTop: 2 },
+  playerStepSubtitle: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
   stepButton: { width: 32, height: 32, borderRadius: Radius.sm, backgroundColor: Colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
   stepButtonText: { color: Colors.textPrimary, fontSize: 20, lineHeight: 24, fontWeight: Typography.weights.medium },
   playerCount: { width: 34, textAlign: 'center', color: Colors.textPrimary, fontSize: Typography.sizes.base, fontWeight: Typography.weights.bold, fontVariant: ['tabular-nums'] },

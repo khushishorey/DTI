@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: Colors.primary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 1.4,
   },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: Colors.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
     marginTop: 1,
   },
   mapCard: {
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   routeTagText: {
     color: Colors.textPrimary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   routeEndText: {
     color: Colors.textPrimary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   },
   statUnit: {
     color: Colors.textSecondary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
   },
   territoryCard: {
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   territoryEyebrow: {
     color: Colors.textSecondary,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.8,
   },

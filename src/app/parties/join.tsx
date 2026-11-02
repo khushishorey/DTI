@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   joinButton: { marginTop: Spacing.lg },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xxl, marginBottom: Spacing.md },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.lg, fontWeight: Typography.weights.semibold },
-  sectionSubtitle: { color: Colors.textSecondary, fontSize: 10, marginTop: 3 },
+  sectionSubtitle: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },
   emptyState: { alignItems: 'center', padding: Spacing.xl, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   emptyTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold, textAlign: 'center' },
   emptyDescription: { color: Colors.textSecondary, fontSize: Typography.sizes.xs, lineHeight: 18, textAlign: 'center', marginTop: Spacing.xs },

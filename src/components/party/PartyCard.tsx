@@ -6,6 +6,7 @@ import { Party, PartyGameMode } from '../../types/party';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { ThemedText } from '../common/ThemedText';
+import { Avatar } from '../common/Avatar';
 
 interface PartyCardProps {
   party: Party;
@@ -45,20 +46,20 @@ export function PartyCard({ party, onPress, actionLabel }: PartyCardProps) {
       <View style={styles.bottomRow}>
         <View style={styles.avatarStack}>
           {party.participants.slice(0, 4).map((player) => (
-            <View key={player.id} style={[styles.avatar, { borderColor: Colors.surface, backgroundColor: `${player.color}30` }]}>
-              <ThemedText style={[styles.avatarInitial, { color: player.color }]}>
-                {player.username.slice(0, 1).toUpperCase()}
-              </ThemedText>
+            <View key={player.id} style={styles.avatarWrap}>
+              <Avatar
+                name={player.username}
+                size={28}
+                borderColor={player.color}
+                borderWidth={1.5}
+              />
             </View>
           ))}
         </View>
         <Button
           title={actionLabel}
           size="sm"
-          onPress={(event) => {
-            event.stopPropagation();
-            onPress();
-          }}
+          onPress={() => onPress()}
           style={styles.actionButton}
         />
       </View>
@@ -178,12 +179,12 @@ const styles = StyleSheet.create({
   },
   metaText: {
     color: Colors.textSecondary,
-    fontSize: 10,
+    fontSize: 12,
   },
   host: {
     flex: 1,
     color: Colors.textMuted,
-    fontSize: 8,
+    fontSize: 11,
     textAlign: 'right',
     fontWeight: Typography.weights.bold,
     letterSpacing: 0.4,
@@ -196,6 +197,9 @@ const styles = StyleSheet.create({
   },
   avatarStack: {
     flexDirection: 'row',
+  },
+  avatarWrap: {
+    marginRight: -6,
   },
   avatar: {
     width: 27,
