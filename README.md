@@ -2,7 +2,7 @@
 
 A running game where your runs capture territory. Run through hex cells on a real map to claim them, steal rivals' cells, and compete in timed party challenges.
 
-Built with Expo (React Native + TypeScript), Expo Router, Zustand, react-native-maps, H3 and Supabase. See [ROADMAP.md](ROADMAP.md) for the plan and [design.md](design.md) for the design system.
+Built with Expo (React Native + TypeScript), Expo Router, Zustand, MapLibre (free OpenFreeMap tiles, no API key), H3 and Supabase. See [ROADMAP.md](ROADMAP.md) for the plan and [design.md](design.md) for the design system.
 
 ## Quick start (no backend needed)
 
@@ -11,12 +11,12 @@ npm install
 npx expo start
 ```
 
-Press `w` for web, or scan the QR code with a development build. Without Supabase keys the app runs in **offline demo mode**: no sign-in, and only the map and running work (Home, Explore and Profile use mock data). Parties and the leaderboard need a backend and sign-in, so offline they show a "Sign in" notice. Runs still work: on web they replay a simulated route, and on a phone they use real GPS.
+Press `w` for web. The native map (MapLibre) is not in Expo Go, so on a phone use a development build (`npx expo run:android` / `eas build --profile development`). Without Supabase keys the app runs in **offline demo mode**: no sign-in, and only the map and running work (Home, Explore and Profile use mock data). Parties and the leaderboard need a backend and sign-in, so offline they show a "Sign in" notice. Runs still work: on web they replay a simulated route, and on a phone they use real GPS.
 
 ## Connect the backend (Supabase)
 
 1. Create a free project at supabase.com.
-2. Copy `.env.example` to `.env` and fill it in (local dev). For EAS builds `.env` is gitignored and invisible to EAS, so run `npx eas-cli@latest env:create` for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (visibility `plaintext` or `sensitive`) and `GOOGLE_MAPS_ANDROID_API_KEY` (visibility `secret`). See the table below.
+2. Copy `.env.example` to `.env` and fill it in (local dev). For EAS builds `.env` is gitignored and invisible to EAS, so run `npx eas-cli@latest env:create` for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (visibility `plaintext` or `sensitive`). See the table below.
 3. Apply the schema:
    ```bash
    npx supabase login
@@ -35,7 +35,6 @@ For the demo, turn off email confirmation (Authentication → Providers → Emai
 | `EXPO_PUBLIC_SUPABASE_URL` | `.env` locally; EAS env var (all profiles) | **Yes** | `src/lib/supabase.ts` |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | same | **Yes** (public, safe because of RLS) | `src/lib/supabase.ts` |
 | `EXPO_PUBLIC_TRACKING_MODE` (`real`\|`simulated`) | `.env`; EAS `preview` profile may set `simulated` for demo APKs | Optional | `src/lib/tracking/sources.ts` |
-| `GOOGLE_MAPS_ANDROID_API_KEY` | `.env` (read by `app.config.ts` at build time, **not** `EXPO_PUBLIC_`); EAS secret | **Yes for Android builds** (map is blank without it) | `app.config.ts` |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected into Edge Functions by Supabase | Nothing to set | `supabase/functions/submit-run/index.ts` |
 | `SUPABASE_ACCESS_TOKEN` | Your shell / CI only (`npx supabase login` or CI secret) | Needed to deploy | Supabase CLI |
 | `SUPABASE_DB_PASSWORD` | Your shell / CI only | Needed for `db push` | Supabase CLI |

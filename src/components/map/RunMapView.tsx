@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, Polygon, Polyline, Region } from 'react-native-maps';
-import { cellPolygon } from '../../lib/h3';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { StyleSheet } from 'react-native';
+import { Camera, GeoJSONSource, Layer, Map, type CameraRef } from '@maplibre/maplibre-react-native';
+import { DEMO_REGION } from '../../constants/map';
+import { Colors } from '../../constants/theme';
+import { cellsToGeoJSON, MAP_STYLE_URL, pointToGeoJSON, routeToGeoJSON } from '../../lib/mapGeo';
 import { Coordinates } from '../../types/territory';
-import { Colors, Radius } from '../../constants/theme';
-import { DARK_MAP_STYLE } from './MapHomeView';
 
 interface RunMapViewProps {
   route: Coordinates[];
@@ -13,96 +13,78 @@ interface RunMapViewProps {
   followCurrentLocation?: boolean;
 }
 
+const FOLLOW_ZOOM = 16.5;
+const FIT_PADDING = { top: 60, right: 60, bottom: 60, left: 60 };
+
 export function RunMapView({ route, capturedCells = [], followCurrentLocation = false }: RunMapViewProps) {
-  const hexes = useMemo(
-    () => capturedCells.map((cell) => ({ cell, coordinates: cellPolygon(cell) })),
-    [capturedCells],
-  );
-  const region = useMemo<Region>(() => {
-    const points = route.length > 0 ? route : [{ latitude: 37.78825, longitude: -122.4324 }];
-    if (followCurrentLocation) {
-      const latest = points[points.length - 1];
-      return {
-        latitude: latest.latitude,
-        longitude: latest.longitude,
-        latitudeDelta: 0.006,
-        longitudeDelta: 0.006,
-      };
+  const cameraRef = useRef<CameraRef>(null);
+  const hexes = useMemo(() => cellsToGeoJSON(capturedCells), [capturedCells]);
+  const line = useMemo(() => routeToGeoJSON(route), [route]);
+  const current = route[route.length - 1];
+  const dot = useMemo(() => pointToGeoJSON(current), [current]);
+
+  // Follow the runner live, or frame the whole route (summary screen).
+  useEffect(() => {
+    if (followCurrentLocation && current) {
+      cameraRef.current?.easeTo({ center: [current.longitude, current.latitude], zoom: FOLLOW_ZOOM, duration: 400 });
+    } else if (route.length >= 2) {
+      const lngs = route.map((p) => p.longitude);
+      const lats = route.map((p) => p.latitude);
+      cameraRef.current?.fitBounds([Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)], {
+        padding: FIT_PADDING,
+        duration: 0,
+      });
     }
-    const latitudes = points.map((point) => point.latitude);
-    const longitudes = points.map((point) => point.longitude);
-    const minLatitude = Math.min(...latitudes);
-    const maxLatitude = Math.max(...latitudes);
-    const minLongitude = Math.min(...longitudes);
-    const maxLongitude = Math.max(...longitudes);
-    return {
-      latitude: (minLatitude + maxLatitude) / 2,
-      longitude: (minLongitude + maxLongitude) / 2,
-      latitudeDelta: Math.max(0.003, (maxLatitude - minLatitude) * 1.8),
-      longitudeDelta: Math.max(0.003, (maxLongitude - minLongitude) * 1.8),
-    };
-  }, [route, followCurrentLocation]);
-  const currentLocation = route[route.length - 1];
+  }, [followCurrentLocation, current, route]);
+
+  const start = route[0] ?? { latitude: DEMO_REGION.latitude, longitude: DEMO_REGION.longitude };
 
   return (
-    <MapView
+    <Map
       style={StyleSheet.absoluteFill}
-      initialRegion={region}
-      region={followCurrentLocation ? region : undefined}
-      customMapStyle={DARK_MAP_STYLE}
-      userInterfaceStyle="dark"
-      mapType="standard"
-      showsCompass={false}
-      showsScale={false}
-      showsPointsOfInterests
-      toolbarEnabled={false}
-      rotateEnabled={false}
-      pitchEnabled={false}
+      mapStyle={MAP_STYLE_URL}
+      compass={false}
+      scaleBar={false}
+      touchRotate={false}
+      touchPitch={false}
       accessibilityLabel="Running route map"
     >
-      {hexes.map(({ cell, coordinates }) => (
-        <Polygon
-          key={cell}
-          coordinates={coordinates}
-          fillColor="rgba(183, 243, 74, 0.18)"
-          strokeColor={Colors.primary}
-          strokeWidth={1.5}
+      <Camera ref={cameraRef} initialViewState={{ center: [start.longitude, start.latitude], zoom: FOLLOW_ZOOM }} />
+      <GeoJSONSource id="run-cells" data={hexes}>
+        <Layer id="run-cells-fill" type="fill" paint={{ 'fill-color': Colors.primary, 'fill-opacity': 0.18 }} />
+        <Layer id="run-cells-line" type="line" paint={{ 'line-color': Colors.primary, 'line-width': 1.5 }} />
+      </GeoJSONSource>
+      <GeoJSONSource id="run-route" data={line}>
+        <Layer
+          id="run-route-glow"
+          type="line"
+          layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+          paint={{ 'line-color': Colors.primary, 'line-width': 10, 'line-opacity': 0.22 }}
         />
-      ))}
-      {route.length > 1 ? (
-        <>
-          <Polyline coordinates={route} strokeColor="rgba(183, 243, 74, 0.22)" strokeWidth={10} />
-          <Polyline coordinates={route} strokeColor={Colors.primary} strokeWidth={4} />
-        </>
-      ) : null}
-      {currentLocation ? (
-        <Marker coordinate={currentLocation} tracksViewChanges={false} anchor={{ x: 0.5, y: 0.5 }}>
-          <View style={styles.markerHalo}>
-            <View style={styles.markerDot} />
-          </View>
-        </Marker>
-      ) : null}
-    </MapView>
+        <Layer
+          id="run-route-line"
+          type="line"
+          layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+          paint={{ 'line-color': Colors.primary, 'line-width': 4 }}
+        />
+      </GeoJSONSource>
+      <GeoJSONSource id="run-position" data={dot}>
+        <Layer
+          id="run-position-halo"
+          type="circle"
+          paint={{ 'circle-radius': 18, 'circle-color': Colors.primary, 'circle-opacity': 0.22 }}
+        />
+        <Layer
+          id="run-position-dot"
+          type="circle"
+          paint={{
+            'circle-radius': 7.5,
+            'circle-color': Colors.primary,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': Colors.textPrimary,
+          }}
+        />
+      </GeoJSONSource>
+    </Map>
   );
 }
-
-const styles = StyleSheet.create({
-  markerHalo: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.full,
-    backgroundColor: 'rgba(183, 243, 74, 0.22)',
-    borderWidth: 1,
-    borderColor: Colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerDot: {
-    width: 15,
-    height: 15,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.primary,
-    borderWidth: 3,
-    borderColor: Colors.textPrimary,
-  },
-});

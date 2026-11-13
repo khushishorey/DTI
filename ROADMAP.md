@@ -78,8 +78,8 @@ leaderboard   VIEW: score = cells_owned*100 + total_km*10 + party_wins*250   (ma
 - Data fetching: add `@tanstack/react-query` for server data. Keep Zustand for local UI state and the live run.
 - Replace `src/data/mock*.ts` one screen at a time. Keep the mocks as a dev seed or for offline mode.
 - Routing: `src/app/(auth)/{welcome,login,register,setup}.tsx` and an auth guard in `_layout.tsx`.
-- `TerritoryOverlays` renders H3 cells as `Polygon`s. Render **only cells in the viewport** and switch to a cluster or heat view when zoomed out, to keep `react-native-maps` fast.
-- Android maps: add a Google Maps API key in `app.json → android.config.googleMaps.apiKey`, through a config plugin or env, never committed.
+- `TerritoryOverlays` renders H3 cells as `Polygon`s. Render **only cells in the viewport** and switch to a cluster or heat view when zoomed out, to keep the map fast. Territories are drawn as one GeoJSON source (MapLibre), not one view per hex.
+- Maps: MapLibre with free OpenFreeMap tiles (no API key, no billing). Needs a development build (not Expo Go).
 
 ---
 

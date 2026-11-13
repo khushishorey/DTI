@@ -1,31 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
-import MapView, { MapStyleElement, Region } from 'react-native-maps';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import { Camera, Map, UserLocation, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import { DEMO_REGION, regionToBounds } from '../../constants/map';
+import { boundsFromLngLat, MAP_STYLE_URL } from '../../lib/mapGeo';
 import type { Bounds } from '../../services/territory';
 import { Territory } from '../../types/territory';
 import { NearbyCompetitor } from '../../types/user';
-import { CurrentPlayerMarker, PlayerMarkers } from './PlayerMarkers';
-import { TerritoryOverlays } from './TerritoryOverlays';
+import { PlayerMarkers } from './PlayerMarkers';
+import { TERRITORY_FILL_LAYER, TerritoryOverlays } from './TerritoryOverlays';
 
-const INITIAL_REGION: Region = DEMO_REGION;
-
-export const DARK_MAP_STYLE: MapStyleElement[] = [
-  { elementType: 'geometry', stylers: [{ color: '#141B18' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#87928B' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#141B18' }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#29332D' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#18211D' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#77837B' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#28332D' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#18211D' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#A2ADA5' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#35433B' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#202A24' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0C1311' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#64756C' }] },
-];
+const START_ZOOM = 15;
 
 interface MapHomeViewProps {
   onSelectTerritory: (territory: Territory) => void;
@@ -43,60 +28,77 @@ export function MapHomeView({
   centerOnLocationKey = 0,
   onBoundsChange,
 }: MapHomeViewProps) {
-  const mapRef = useRef<MapView>(null);
-  const [userRegion, setUserRegion] = useState<Region | null>(null);
+  const mapRef = useRef<MapRef>(null);
+  const cameraRef = useRef<CameraRef>(null);
+  const [permitted, setPermitted] = useState(false);
+  const me = useRef<[number, number] | null>(null); // [lng, lat], latest GPS fix
+  const centeredOnce = useRef(false);
 
-  // Open on the player's real position when location permission was already granted
-  // (we don't prompt here; the run screen asks when it's needed).
+  // Ask for location when the map opens, then follow the real GPS position live.
   useEffect(() => {
+    let subscription: Location.LocationSubscription | undefined;
     let cancelled = false;
     (async () => {
-      const { granted } = await Location.getForegroundPermissionsAsync();
-      if (!granted) return;
-      const position = await Location.getLastKnownPositionAsync();
-      if (!position || cancelled) return;
-      const region = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        latitudeDelta: INITIAL_REGION.latitudeDelta,
-        longitudeDelta: INITIAL_REGION.longitudeDelta,
-      };
-      setUserRegion(region);
-      mapRef.current?.animateToRegion(region, 350);
+      const { granted } = await Location.requestForegroundPermissionsAsync();
+      if (!granted || cancelled) return;
+      setPermitted(true);
+      subscription = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, distanceInterval: 5, timeInterval: 3000 },
+        (position) => {
+          me.current = [position.coords.longitude, position.coords.latitude];
+          if (!centeredOnce.current) {
+            centeredOnce.current = true; // jump to the player once; after that they can pan freely
+            cameraRef.current?.easeTo({ center: me.current, zoom: START_ZOOM, duration: 500 });
+          }
+        },
+      );
+      if (cancelled) subscription.remove();
     })().catch(() => {});
     return () => {
       cancelled = true;
+      subscription?.remove();
     };
   }, []);
 
   useEffect(() => {
-    if (centerOnLocationKey > 0) {
-      mapRef.current?.animateToRegion(userRegion ?? INITIAL_REGION, 350);
+    if (centerOnLocationKey > 0 && me.current) {
+      cameraRef.current?.easeTo({ center: me.current, zoom: START_ZOOM, duration: 350 });
     }
-  }, [centerOnLocationKey, userRegion]);
+  }, [centerOnLocationKey]);
+
+  const onPress = useCallback(
+    async (event: { nativeEvent: { point: [number, number] } }) => {
+      const features = await mapRef.current?.queryRenderedFeatures(event.nativeEvent.point, {
+        layers: [TERRITORY_FILL_LAYER],
+      });
+      const id = features?.[0]?.properties?.id;
+      const territory = territories.find((t) => t.id === id);
+      if (territory) onSelectTerritory(territory);
+    },
+    [territories, onSelectTerritory],
+  );
 
   return (
-    <MapView
+    <Map
       ref={mapRef}
       style={StyleSheet.absoluteFill}
-      initialRegion={INITIAL_REGION}
-      customMapStyle={DARK_MAP_STYLE}
-      userInterfaceStyle="dark"
-      mapType="standard"
-      showsCompass={false}
-      showsScale={false}
-      showsPointsOfInterests
-      toolbarEnabled={false}
-      rotateEnabled={false}
-      pitchEnabled={false}
+      mapStyle={MAP_STYLE_URL}
+      compass={false}
+      scaleBar={false}
+      touchRotate={false}
+      touchPitch={false}
       accessibilityLabel="Territory map"
-      showsUserLocation={Boolean(userRegion)}
-      onMapReady={() => onBoundsChange?.(regionToBounds(INITIAL_REGION))}
-      onRegionChangeComplete={(region) => onBoundsChange?.(regionToBounds(region))}
+      onPress={onPress}
+      onDidFinishLoadingMap={() => onBoundsChange?.(regionToBounds(DEMO_REGION))}
+      onRegionDidChange={(event) => onBoundsChange?.(boundsFromLngLat(event.nativeEvent.bounds))}
     >
-      <TerritoryOverlays territories={territories} onSelect={onSelectTerritory} />
-      {userRegion ? null : <CurrentPlayerMarker />}
+      <Camera
+        ref={cameraRef}
+        initialViewState={{ center: [DEMO_REGION.longitude, DEMO_REGION.latitude], zoom: START_ZOOM }}
+      />
+      <TerritoryOverlays territories={territories} />
       <PlayerMarkers players={players} />
-    </MapView>
+      {permitted ? <UserLocation animated accuracy /> : null}
+    </Map>
   );
 }

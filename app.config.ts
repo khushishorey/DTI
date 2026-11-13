@@ -20,9 +20,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
-    config: {
-      googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY },
-    },
   },
   web: {
     output: 'server',
@@ -45,6 +42,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           'run.io uses your location to track your run and capture territory on the map.',
       },
     ],
+    '@maplibre/maplibre-react-native',
     'expo-status-bar',
     'expo-web-browser',
   ],
