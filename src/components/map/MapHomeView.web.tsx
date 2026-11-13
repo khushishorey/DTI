@@ -3,17 +3,15 @@ import { LayoutChangeEvent, StyleSheet, useWindowDimensions, View } from 'react-
 import Svg, { Polygon } from 'react-native-svg';
 import { Colors, Radius } from '../../constants/theme';
 import { DEMO_BOUNDS, DEMO_REGION } from '../../constants/map';
-import { MOCK_NEARBY_PLAYERS } from '../../data/mockPlayers';
-import { MOCK_TERRITORIES } from '../../data/mockTerritories';
-import { RUN_START } from '../../data/mockRunRoute';
 import type { Bounds } from '../../services/territory';
 import { Coordinates, Territory } from '../../types/territory';
+import { NearbyCompetitor } from '../../types/user';
 import { MapCanvas } from './MapCanvas.web';
 
 interface MapHomeViewProps {
   onSelectTerritory: (territory: Territory) => void;
   territories?: Territory[];
-  players?: typeof MOCK_NEARBY_PLAYERS;
+  players?: NearbyCompetitor[];
   centerOnLocationKey?: number;
   onBoundsChange?: (bounds: Bounds) => void;
 }
@@ -25,8 +23,8 @@ interface MapHomeViewProps {
  */
 export function MapHomeView({
   onSelectTerritory,
-  territories = MOCK_TERRITORIES,
-  players = MOCK_NEARBY_PLAYERS,
+  territories = [],
+  players = [],
   centerOnLocationKey = 0,
   onBoundsChange,
 }: MapHomeViewProps) {
@@ -45,7 +43,7 @@ export function MapHomeView({
     if (width > 0 && height > 0) setMeasured({ width, height });
   };
 
-  const me = project(RUN_START);
+  const me = project(SIMULATED_POSITION);
 
   return (
     <MapCanvas key={centerOnLocationKey} onLayout={onLayout} accessibilityLabel="Territory map preview">
@@ -91,6 +89,9 @@ export function MapHomeView({
     </MapCanvas>
   );
 }
+
+// Same simulated "you are here" spot as the native CurrentPlayerMarker.
+const SIMULATED_POSITION: Coordinates = { latitude: 37.78825, longitude: -122.4324 };
 
 /** Equirectangular projection that covers the canvas with the demo region (equal x/y scale). */
 function createProjection(width: number, height: number) {

@@ -16,7 +16,9 @@ import { MOCK_TERRITORIES } from '../data/mockTerritories';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { DEMO_BOUNDS } from '../constants/map';
 import { useMyStats, useTerritoriesInBounds } from '../hooks/useServerData';
+import { nearbyRunnersFromTerritories } from '../services/players';
 import type { Bounds } from '../services/territory';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useRunStore } from '../stores/useRunStore';
 import { Territory } from '../types/territory';
 import { formatArea } from '../utils/formatters';
@@ -27,25 +29,39 @@ export default function Index() {
   const runStatus = useRunStore((state) => state.status);
   const startRun = useRunStore((state) => state.startRun);
   const [bounds, setBounds] = useState<Bounds>(DEMO_BOUNDS);
-  // Live cells from the server when signed in; mock territory in offline demo mode.
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  // Live cells from the server when online; mock territory only in offline demo mode.
   const { territories: liveTerritories } = useTerritoriesInBounds(bounds);
-  const territories = liveTerritories ?? MOCK_TERRITORIES;
+  const territories = liveTerritories ?? (offline ? MOCK_TERRITORIES : []);
   const { data: myStats } = useMyStats();
+
+  // Online: runners owning cells in view (no live positions). Offline demo: mock players.
+  const nearby = useMemo(() => (offline
+    ? MOCK_NEARBY_PLAYERS.map((p) => ({ id: p.id, username: p.username, color: p.territoryColor, detail: formatDistance(p.distanceFromUserMeters), a11y: `${formatDistance(p.distanceFromUserMeters)} away` }))
+    : nearbyRunnersFromTerritories(liveTerritories ?? [], myUserId).map((r) => ({ id: r.id, username: r.username, color: r.color, detail: formatCells(r.cellCount), a11y: `owns ${formatCells(r.cellCount)} in view` }))
+  ), [offline, liveTerritories, myUserId]);
 
   const territoryStats = useMemo(() => {
     if (myStats) return { area: myStats.areaOwnedKm2, count: myStats.cellsOwned };
+    if (!offline) return { area: 0, count: 0 };
     const owned = MOCK_TERRITORIES.filter((territory) => territory.isCurrentPlayer);
     return {
       area: owned.reduce((total, territory) => total + territory.areaKm2, 0),
       count: owned.length,
     };
-  }, [myStats]);
+  }, [myStats, offline]);
 
   const isRunning = runStatus === 'running' || runStatus === 'paused';
 
   return (
     <View style={styles.screen}>
-      <MapHomeView onSelectTerritory={setSelectedTerritory} territories={territories} onBoundsChange={setBounds} />
+      <MapHomeView
+        onSelectTerritory={setSelectedTerritory}
+        territories={territories}
+        players={offline ? MOCK_NEARBY_PLAYERS : undefined}
+        onBoundsChange={setBounds}
+      />
 
       <View style={[styles.topOverlay, { top: insets.top + Spacing.sm }]} pointerEvents="box-none">
         <View style={styles.headerRow}>
@@ -88,45 +104,45 @@ export default function Index() {
             <View style={styles.statDivider} />
             <View style={styles.statSecondary}>
               <ThemedText style={styles.statSecondaryValue}>{territoryStats.count}</ThemedText>
-              <ThemedText style={styles.statSecondaryLabel}>{myStats ? 'CELLS' : 'TERRITORIES'}</ThemedText>
+              <ThemedText style={styles.statSecondaryLabel}>{offline ? 'TERRITORIES' : 'CELLS'}</ThemedText>
             </View>
           </Card>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${MOCK_NEARBY_PLAYERS.length} nearby runners. Tap to explore.`}
+            accessibilityLabel={`${nearby.length} nearby runners. Tap to explore.`}
             onPress={() => router.push('/explore')}
             style={({ pressed }) => [styles.nearbyCard, pressed && styles.pressed]}
           >
             <View style={styles.nearbyHeader}>
               <View style={styles.onlineDot} />
               <ThemedText style={styles.nearbyTitle}>NEARBY</ThemedText>
-              <ThemedText style={styles.nearbyCount}>{MOCK_NEARBY_PLAYERS.length}</ThemedText>
+              <ThemedText style={styles.nearbyCount}>{nearby.length}</ThemedText>
             </View>
             <View style={styles.nearbyAvatars}>
-              {MOCK_NEARBY_PLAYERS.slice(0, 3).map((player) => (
+              {nearby.slice(0, 3).map((player) => (
                 <View key={player.id} style={styles.nearbyAvatarWrap}>
                   <Avatar name={player.username} size={28} borderWidth={2} borderColor={Colors.surface} />
-                  <View style={[styles.avatarStatus, { backgroundColor: player.territoryColor }]} />
+                  <View style={[styles.avatarStatus, { backgroundColor: player.color }]} />
                 </View>
               ))}
             </View>
-            <ThemedText style={styles.nearbySubtext}>IN YOUR ZONE</ThemedText>
+            <ThemedText style={styles.nearbySubtext}>{nearby.length ? 'IN YOUR ZONE' : 'NO RIVALS YET'}</ThemedText>
           </Pressable>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerPills}>
-          {MOCK_NEARBY_PLAYERS.map((player) => (
+          {nearby.map((player) => (
             <Pressable
               key={player.id}
               accessibilityRole="button"
-              accessibilityLabel={`Runner ${player.username}, ${formatDistance(player.distanceFromUserMeters)} away`}
+              accessibilityLabel={`Runner ${player.username}, ${player.a11y}`}
               onPress={() => router.push({ pathname: '/player/[id]', params: { id: player.id } })}
               style={({ pressed }) => [styles.playerPill, pressed && styles.pressed]}
             >
-              <View style={[styles.playerPillDot, { backgroundColor: player.territoryColor }]} />
+              <View style={[styles.playerPillDot, { backgroundColor: player.color }]} />
               <ThemedText style={styles.playerPillName}>{player.username}</ThemedText>
-              <ThemedText style={styles.playerDistance}>{formatDistance(player.distanceFromUserMeters)}</ThemedText>
+              <ThemedText style={styles.playerDistance}>{player.detail}</ThemedText>
             </Pressable>
           ))}
         </ScrollView>
@@ -190,7 +206,7 @@ export default function Index() {
                 ) : null}
               </View>
             </View>
-            {!liveTerritories && !selectedTerritory.isCurrentPlayer && selectedTerritory.ownerId ? (
+            {!selectedTerritory.isCurrentPlayer && selectedTerritory.ownerId ? (
               <Button
                 title="VIEW RUNNER PROFILE"
                 variant="secondary"
@@ -212,6 +228,10 @@ export default function Index() {
 
 function formatDistance(meters: number) {
   return meters < 1000 ? `${meters} m` : `${(meters / 1000).toFixed(1)} km`;
+}
+
+function formatCells(count: number) {
+  return `${count} ${count === 1 ? 'cell' : 'cells'}`;
 }
 
 function formatDate(value: string) {

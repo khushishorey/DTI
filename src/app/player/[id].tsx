@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, Shield, Trophy } from 'lucide-react-native';
+import { ArrowLeft, Footprints, MapPin, Shield, Trophy, Zap } from 'lucide-react-native';
 import { AppBottomNavigation } from '../../components/common/AppBottomNavigation';
 import { Avatar } from '../../components/common/Avatar';
 import { Button } from '../../components/common/Button';
@@ -11,17 +11,45 @@ import { ThemedText } from '../../components/common/ThemedText';
 import { MOCK_NEARBY_PLAYERS } from '../../data/mockPlayers';
 import { MOCK_EXPLORE_TERRITORIES } from '../../data/mockTerritories';
 import { MOCK_PROFILE } from '../../data/mockProfile';
+import { PartyNotice } from '../../components/party/PartyNotice';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { DEMO_BOUNDS } from '../../constants/map';
+import { usePlayer, useTerritoriesInBounds } from '../../hooks/useServerData';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 export default function PlayerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const player = MOCK_NEARBY_PLAYERS.find((item) => item.id === id);
-  const isCurrentPlayer = id === MOCK_PROFILE.id;
-  const username = isCurrentPlayer ? MOCK_PROFILE.username : player?.username ?? 'Runner';
-  const level = isCurrentPlayer ? MOCK_PROFILE.level : player?.level ?? 1;
-  const playerTerritories = MOCK_EXPLORE_TERRITORIES.filter((territory) => territory.ownerId === id);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const isMe = !offline && Boolean(id) && id === myUserId;
+  const playerQuery = usePlayer(isMe ? undefined : id);
+  const summary = playerQuery.data;
+  // ponytail: only cells inside the demo area are listed; there are no stored map bounds yet.
+  const { territories: liveTerritories } = useTerritoriesInBounds(DEMO_BOUNDS);
+
+  useEffect(() => {
+    if (isMe) router.replace('/profile');
+  }, [isMe]);
+
+  // Offline demo keeps the mock runners; online uses the player summary.
+  const player = offline ? MOCK_NEARBY_PLAYERS.find((item) => item.id === id) : undefined;
+  const isCurrentPlayer = offline && id === MOCK_PROFILE.id;
+  const username = offline ? (isCurrentPlayer ? MOCK_PROFILE.username : player?.username ?? 'Runner') : summary?.username ?? 'Runner';
+  const level = offline ? (isCurrentPlayer ? MOCK_PROFILE.level : player?.level ?? 1) : summary?.level ?? 1;
+  const accent = offline ? (isCurrentPlayer ? Colors.primary : player?.territoryColor ?? Colors.primary) : summary?.color ?? Colors.primary;
+  const playerTerritories = (offline ? MOCK_EXPLORE_TERRITORIES : liveTerritories ?? []).filter((territory) => territory.ownerId === id);
   const capturedArea = playerTerritories.reduce((total, territory) => total + territory.areaKm2, 0);
+  const stats = offline || !summary
+    ? [
+        { label: 'KM² CLAIMED', value: capturedArea.toFixed(3), icon: MapPin },
+        { label: 'TERRITORIES', value: `${playerTerritories.length}`, icon: Trophy },
+      ]
+    : [
+        { label: 'CELLS', value: `${summary.cellsOwned}`, icon: MapPin },
+        { label: 'KM', value: summary.totalKm.toFixed(1), icon: Footprints },
+        { label: 'RUNS', value: `${summary.runCount}`, icon: Zap },
+      ];
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -36,20 +64,34 @@ export default function PlayerProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + 106 }]}>
         <Button title="BACK" variant="ghost" leftIcon={<Icon icon={ArrowLeft} size={17} color={Colors.textPrimary} />} onPress={handleBack} style={styles.backButton} />
 
+        {isMe ? null : !offline && !summary ? (
+          playerQuery.isError ? (
+            <PartyNotice title="Couldn’t load this runner" body={playerQuery.error.message} actionLabel="TRY AGAIN" onAction={() => void playerQuery.refetch()} />
+          ) : playerQuery.isPending ? (
+            <PartyNotice loading title="Loading runner…" />
+          ) : (
+            <PartyNotice title="Runner not found" body="This runner may have left run.io." actionLabel="EXPLORE" onAction={() => router.replace('/explore')} />
+          )
+        ) : (
+        <>
         <View style={styles.profileCard}>
           <View style={styles.avatarWrap}>
-            <Avatar name={username} source={player?.avatarUrl || undefined} size={82} borderColor={isCurrentPlayer ? Colors.primary : player?.territoryColor ?? Colors.primary} />
+            <Avatar name={username} source={(offline ? player?.avatarUrl : summary?.avatarUrl) || undefined} size={82} borderColor={accent} />
             <View style={styles.levelBadge}><ThemedText style={styles.levelText}>{level}</ThemedText></View>
           </View>
           <ThemedText style={styles.username}>{username}</ThemedText>
-          <View style={styles.locationLine}>
-            <Icon icon={MapPin} size={13} color={Colors.textSecondary} />
-            <ThemedText style={styles.locationText}>Pacific Heights · San Francisco</ThemedText>
-          </View>
-          <View style={styles.statusLine}>
-            <View style={[styles.onlineDot, { backgroundColor: player?.isOnline ? Colors.primary : Colors.textMuted }]} />
-            <ThemedText style={styles.statusText}>{isCurrentPlayer ? 'Your profile' : player?.isOnline ? 'Running nearby' : 'Last seen nearby'}</ThemedText>
-          </View>
+          {offline ? (
+            <>
+              <View style={styles.locationLine}>
+                <Icon icon={MapPin} size={13} color={Colors.textSecondary} />
+                <ThemedText style={styles.locationText}>Pacific Heights · San Francisco</ThemedText>
+              </View>
+              <View style={styles.statusLine}>
+                <View style={[styles.onlineDot, { backgroundColor: player?.isOnline ? Colors.primary : Colors.textMuted }]} />
+                <ThemedText style={styles.statusText}>{isCurrentPlayer ? 'Your profile' : player?.isOnline ? 'Running nearby' : 'Last seen nearby'}</ThemedText>
+              </View>
+            </>
+          ) : null}
         </View>
 
         <View style={styles.sectionHeading}>
@@ -57,16 +99,13 @@ export default function PlayerProfileScreen() {
           <Icon icon={Shield} size={17} color={Colors.primary} />
         </View>
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Icon icon={MapPin} size={15} color={Colors.primary} />
-            <ThemedText style={styles.statValue}>{capturedArea.toFixed(3)}</ThemedText>
-            <ThemedText style={styles.statLabel}>KM² CLAIMED</ThemedText>
-          </View>
-          <View style={styles.statCard}>
-            <Icon icon={Trophy} size={15} color={Colors.primary} />
-            <ThemedText style={styles.statValue}>{playerTerritories.length}</ThemedText>
-            <ThemedText style={styles.statLabel}>TERRITORIES</ThemedText>
-          </View>
+          {stats.map((stat) => (
+            <View key={stat.label} style={styles.statCard}>
+              <Icon icon={stat.icon} size={15} color={Colors.primary} />
+              <ThemedText style={styles.statValue}>{stat.value}</ThemedText>
+              <ThemedText style={styles.statLabel}>{stat.label}</ThemedText>
+            </View>
+          ))}
         </View>
 
         <ThemedText style={styles.sectionTitle}>Claimed ground</ThemedText>
@@ -80,6 +119,8 @@ export default function PlayerProfileScreen() {
           </View>
         )) : (
           <View style={styles.emptyCard}><ThemedText style={styles.emptyText}>No territory records yet.</ThemedText></View>
+        )}
+        </>
         )}
       </ScrollView>
       <AppBottomNavigation activeTab="explore" />

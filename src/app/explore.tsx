@@ -17,6 +17,7 @@ import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { DEMO_BOUNDS } from '../constants/map';
 import { useTerritoriesInBounds } from '../hooks/useServerData';
 import type { Bounds } from '../services/territory';
+import { useAuthStore } from '../stores/useAuthStore';
 import { Territory } from '../types/territory';
 import { formatArea } from '../utils/formatters';
 
@@ -32,9 +33,10 @@ export default function ExploreScreen() {
   const [centerMessage, setCenterMessage] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const [bounds, setBounds] = useState<Bounds>(DEMO_BOUNDS);
+  const offline = useAuthStore((state) => state.status === 'offline');
   const { territories: liveTerritories } = useTerritoriesInBounds(bounds);
-  const isLive = liveTerritories !== null;
-  const allTerritories = liveTerritories ?? MOCK_EXPLORE_TERRITORIES;
+  // Mock territory and players only in offline demo mode; online never falls back to them.
+  const allTerritories = liveTerritories ?? (offline ? MOCK_EXPLORE_TERRITORIES : []);
 
   const visibleTerritories = useMemo(() => allTerritories.filter((territory) => {
     const status = territory.status ?? 'owned';
@@ -49,13 +51,15 @@ export default function ExploreScreen() {
     return matchesFilter && matchesSearch;
   }), [allTerritories, filter, normalizedQuery]);
 
+  // Live player positions are out of scope, so online the map shows no player markers.
   const visiblePlayers = useMemo(() => {
+    if (!offline) return [];
     if (!normalizedQuery) return MOCK_NEARBY_PLAYERS;
     const playerMatches = MOCK_NEARBY_PLAYERS.filter((player) => player.username.toLowerCase().includes(normalizedQuery));
     return playerMatches.length ? playerMatches : MOCK_NEARBY_PLAYERS;
-  }, [normalizedQuery]);
+  }, [offline, normalizedQuery]);
 
-  const selectedOwner = selectedTerritory
+  const selectedOwner = offline && selectedTerritory
     ? MOCK_NEARBY_PLAYERS.find((player) => player.id === selectedTerritory.ownerId)
     : undefined;
   const selectedStatus = selectedTerritory ? getStatus(selectedTerritory) : undefined;
@@ -147,8 +151,8 @@ export default function ExploreScreen() {
 
       {visibleTerritories.length === 0 ? (
         <View style={styles.noResults} pointerEvents="none">
-          <ThemedText style={styles.noResultsTitle}>No territories found</ThemedText>
-          <ThemedText style={styles.noResultsText}>Try another filter or search term.</ThemedText>
+          <ThemedText style={styles.noResultsTitle}>{allTerritories.length ? 'No territories found' : 'No territory claimed here yet'}</ThemedText>
+          <ThemedText style={styles.noResultsText}>{allTerritories.length ? 'Try another filter or search term.' : 'Start a run to claim the first cells.'}</ThemedText>
         </View>
       ) : null}
 
@@ -196,7 +200,6 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            {isLive ? null : (
             <Button
               title={selectedStatus === 'Unclaimed' ? 'UNCLAIMED TERRITORY' : 'VIEW PROFILE'}
               variant={selectedStatus === 'Unclaimed' ? 'secondary' : 'primary'}
@@ -206,7 +209,6 @@ export default function ExploreScreen() {
               leftIcon={<Icon icon={selectedStatus === 'Unclaimed' ? MapPin : Users} size={16} color={selectedStatus === 'Unclaimed' ? Colors.textSecondary : Colors.textInverse} />}
               style={styles.profileButton}
             />
-            )}
           </View>
         ) : null}
       </BottomSheet>

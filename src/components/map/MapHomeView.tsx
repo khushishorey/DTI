@@ -4,9 +4,8 @@ import { StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
 import { DEMO_REGION, regionToBounds } from '../../constants/map';
 import type { Bounds } from '../../services/territory';
-import { MOCK_TERRITORIES } from '../../data/mockTerritories';
-import { MOCK_NEARBY_PLAYERS } from '../../data/mockPlayers';
 import { Territory } from '../../types/territory';
+import { NearbyCompetitor } from '../../types/user';
 import { CurrentPlayerMarker, PlayerMarkers } from './PlayerMarkers';
 import { TerritoryOverlays } from './TerritoryOverlays';
 
@@ -31,7 +30,7 @@ export const DARK_MAP_STYLE: MapStyleElement[] = [
 interface MapHomeViewProps {
   onSelectTerritory: (territory: Territory) => void;
   territories?: Territory[];
-  players?: typeof MOCK_NEARBY_PLAYERS;
+  players?: NearbyCompetitor[];
   centerOnLocationKey?: number;
   /** Called with the visible area whenever the map settles, to load cells in view. */
   onBoundsChange?: (bounds: Bounds) => void;
@@ -39,8 +38,8 @@ interface MapHomeViewProps {
 
 export function MapHomeView({
   onSelectTerritory,
-  territories = MOCK_TERRITORIES,
-  players = MOCK_NEARBY_PLAYERS,
+  territories = [],
+  players = [],
   centerOnLocationKey = 0,
   onBoundsChange,
 }: MapHomeViewProps) {

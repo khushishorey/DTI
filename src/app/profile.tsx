@@ -15,7 +15,12 @@ import { Button } from '../components/common/Button';
 import { signOut } from '../services/auth';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useMyRuns, useMyStats } from '../hooks/useServerData';
+import { deriveAchievements } from '../lib/achievements';
+import type { MyStats } from '../services/stats';
 import { runToActivity } from '../utils/runActivity';
+
+// All achievements locked until real stats load.
+const NO_STATS: MyStats = { totalDistanceKm: 0, totalDurationSeconds: 0, runCount: 0, cellsOwned: 0, areaOwnedKm2: 0, cellsCaptured: 0, xp: 0, level: 1 };
 
 const ACHIEVEMENT_ICONS = {
   footprints: Footprints,
@@ -28,31 +33,31 @@ const ACHIEVEMENT_ICONS = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const offline = useAuthStore((state) => state.status === 'offline');
   const account = useAuthStore((state) => state.profile);
   const { data: stats } = useMyStats();
   const { data: runs, isLoading: runsLoading } = useMyRuns();
-  // Signed in: real profile, stats and runs. Offline demo mode: mock data.
-  // (Wins, streak and achievements arrive with parties in week 3.)
-  const profile = account
-    ? {
-        ...MOCK_PROFILE,
-        username: account.username,
-        level: account.level,
+  // Online: only real profile, stats and runs (never mock). Offline demo mode: mock data.
+  // Wins and streaks have no live source yet, so they only appear offline.
+  const profile = offline
+    ? MOCK_PROFILE
+    : {
+        username: account?.username ?? '',
+        level: account?.level ?? 1,
         totalDistanceKm: stats?.totalDistanceKm ?? 0,
         totalTerritoryCapturedKm2: stats?.areaOwnedKm2 ?? 0,
         totalRunsCount: stats?.runCount ?? 0,
-        winsCount: 0,
-      }
-    : MOCK_PROFILE;
+      };
   const accentColor = account?.color ?? Colors.primary;
-  const xp = account?.xp ?? 2480;
-  const xpIntoLevel = account ? xp % 1000 : 2480;
-  const xpForLevel = account ? 1000 : 3000;
-  const activities = account ? (runs ?? []).map((run) => runToActivity(run)) : MOCK_RECENT_ACTIVITIES;
-  const memberSince = account
-    ? new Date(account.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()
-    : 'FEB 2025';
-  const unlockedCount = MOCK_ACHIEVEMENTS.filter((achievement) => achievement.unlocked).length;
+  const xp = offline ? 2480 : account?.xp ?? 0;
+  const xpIntoLevel = offline ? xp : xp % 1000;
+  const xpForLevel = offline ? 3000 : 1000;
+  const activities = offline ? MOCK_RECENT_ACTIVITIES : (runs ?? []).map((run) => runToActivity(run));
+  const memberSince = offline
+    ? 'FEB 2025'
+    : account ? new Date(account.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase() : '';
+  const achievements = offline ? MOCK_ACHIEVEMENTS : deriveAchievements(stats ?? NO_STATS);
+  const unlockedCount = achievements.filter((achievement) => achievement.unlocked).length;
 
   return (
     <View style={styles.screen}>
@@ -65,12 +70,12 @@ export default function ProfileScreen() {
             <ThemedText style={styles.pageTitle}>Profile</ThemedText>
             <ThemedText style={styles.pageSubtitle}>Your running record.</ThemedText>
           </View>
-          {account ? null : (
+          {offline ? (
             <View style={styles.streakPill}>
               <Icon icon={Flame} size={14} color={Colors.competitorOrange} />
               <ThemedText style={styles.streakText}>7 DAY STREAK</ThemedText>
             </View>
-          )}
+          ) : null}
         </View>
 
         <View style={styles.profileCard}>
@@ -81,12 +86,12 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.profileCopy}>
               <ThemedText style={styles.username}>{profile.username}</ThemedText>
-              {account ? null : (
+              {offline ? (
                 <View style={styles.locationLine}>
                   <Icon icon={MapPin} size={12} color={Colors.textSecondary} />
                   <ThemedText style={styles.locationText}>San Francisco, CA</ThemedText>
                 </View>
-              )}
+              ) : null}
               <ThemedText style={styles.memberSince}>RUNNER SINCE {memberSince}</ThemedText>
             </View>
             <View style={styles.levelPill}>
@@ -114,18 +119,20 @@ export default function ProfileScreen() {
           <ProfileStatCard label="TOTAL DISTANCE" value={profile.totalDistanceKm.toFixed(1)} unit="KM" icon={<Icon icon={Footprints} size={14} color={Colors.primary} />} />
           <ProfileStatCard label="TERRITORY" value={profile.totalTerritoryCapturedKm2.toFixed(3)} unit="KM²" icon={<Icon icon={MapPinned} size={14} color={Colors.primary} />} />
           <ProfileStatCard label="TOTAL RUNS" value={`${profile.totalRunsCount}`} icon={<Icon icon={Zap} size={14} color={Colors.primary} />} />
-          <ProfileStatCard label="COMPETITION WINS" value={`${profile.winsCount}`} icon={<Icon icon={Trophy} size={14} color={Colors.primary} />} />
+          {offline ? (
+            <ProfileStatCard label="COMPETITION WINS" value={`${MOCK_PROFILE.winsCount}`} icon={<Icon icon={Trophy} size={14} color={Colors.primary} />} />
+          ) : null}
         </View>
 
         <View style={styles.sectionHeader}>
           <View>
             <ThemedText style={styles.sectionTitle}>Achievements</ThemedText>
-            <ThemedText style={styles.sectionSubtitle}>{unlockedCount} unlocked · {MOCK_ACHIEVEMENTS.length - unlockedCount} in progress</ThemedText>
+            <ThemedText style={styles.sectionSubtitle}>{unlockedCount} unlocked · {achievements.length - unlockedCount} in progress</ThemedText>
           </View>
           <Icon icon={Award} size={18} color={Colors.primary} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.achievementList}>
-          {MOCK_ACHIEVEMENTS.map((achievement) => {
+          {achievements.map((achievement) => {
             const AchievementIcon = ACHIEVEMENT_ICONS[achievement.icon];
             return (
               <AchievementCard
@@ -147,7 +154,7 @@ export default function ProfileScreen() {
           </View>
           <Icon icon={Medal} size={17} color={Colors.textSecondary} />
         </View>
-        {account && !runsLoading && activities.length === 0 ? (
+        {!offline && !runsLoading && activities.length === 0 ? (
           <View style={styles.emptyActivity}>
             <ThemedText style={styles.emptyActivityTitle}>No runs yet</ThemedText>
             <ThemedText style={styles.emptyActivityText}>Start a run from the map to claim your first cells.</ThemedText>
