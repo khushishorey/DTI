@@ -11,16 +11,14 @@ Checked by running the web build and reading the code:
 
 | Area | Status |
 |---|---|
-| Screens | Done (UI only): Home map, Explore, Run, Summary, Leaderboard, Profile, Player, Parties (list, create, join, lobby, live leaderboard, results) |
+| Screens | Done: Home map, Explore, Run, Summary, Leaderboard, Profile, Player, Auth, Parties (list, create, join, lobby, live leaderboard, results) |
 | Design system | Done: theme tokens, Button/Card/Input/Modal/BottomSheet/Avatar/Badge, `design.md` |
-| State | Zustand stores for run, territory and party, all fed by `src/data/mock*.ts` |
-| Run tracking | **Simulated**: `run.tsx` ticks a `setInterval` at a fixed 7:10/km pace along `SIMULATED_RUN_ROUTE` |
-| Territory capture | **Fake**: `endRun()` gives `distance / 25000` km² and always "1 territory"; "Sector Alpha" is hard-coded |
-| Backend / auth | None. No login, sign-up or profile setup screens, although `design.md` §7 lists them |
-| Location | `expo-location` is not installed |
-| Quality | `tsc --noEmit` passes. No tests. README is the Expo template |
+| Auth, run tracking, capture | **Live**: Supabase auth, real GPS (simulator behind `EXPO_PUBLIC_TRACKING_MODE`), H3 capture, server-validated `submit-run` |
+| Parties, leaderboard, profile | **Live**: create/join by code, lobby, realtime standings, global/nearby/party leaderboards, real profile stats and achievements. Mock data is used only offline (map + run) |
+| Tests | Jest unit tests (geo, H3, GPS filter, run scoring, adapters) and pgTAP (`npx supabase test db`) |
+| Still open | Live opponent positions on the map, `party_wins` / wins stat and the two win-based achievements, background tracking, anti-cheat beyond `runScoring.ts`, push notifications |
 
-**Summary:** the front end is in good shape. The work left is making it **real**: GPS, capture rules, persistence and multiplayer.
+**Summary:** the core loop and parties are live. What is left is the "still open" row above plus the on-device release test.
 
 ---
 

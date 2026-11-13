@@ -11,8 +11,6 @@ import { LeaderboardEntryRow } from '../components/leaderboard/LeaderboardEntryR
 import { LeaderboardPodium } from '../components/leaderboard/LeaderboardPodium';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { DEMO_BOUNDS } from '../constants/map';
-import { getPartyRankings, MOCK_GLOBAL_RANKINGS, MOCK_NEARBY_RANKINGS } from '../data/mockLeaderboard';
-import { MOCK_PARTIES } from '../data/mockParties';
 import { useParty } from '../hooks/useParties';
 import { useGlobalLeaderboard, useNearbyLeaderboard, usePartyLeaderboard } from '../hooks/useServerData';
 import { PartyNotice } from '../components/party/PartyNotice';
@@ -41,17 +39,9 @@ export default function LeaderboardScreen() {
 
   const needsParty = category === 'party' && !activePartyId && !offline;
   const query = category === 'nearby' ? nearbyQuery : category === 'party' ? partyQuery : globalQuery;
-  const partyName = offline ? MOCK_PARTIES[0].name : activeParty?.name ?? 'Your party';
+  const partyName = activeParty?.name ?? 'Your party';
 
-  // Offline demo keeps the mock rankings; online never falls back to them.
-  const entries = useMemo<LeaderboardEntry[]>(() => {
-    if (offline) {
-      if (category === 'nearby') return MOCK_NEARBY_RANKINGS;
-      if (category === 'party') return getPartyRankings(MOCK_PARTIES[0]);
-      return MOCK_GLOBAL_RANKINGS;
-    }
-    return query.data ?? [];
-  }, [offline, category, query.data]);
+  const entries = useMemo<LeaderboardEntry[]>(() => query.data ?? [], [query.data]);
 
   const info = CATEGORY_INFO[category];
   const CategoryIcon = info.icon;
@@ -83,11 +73,13 @@ export default function LeaderboardScreen() {
           <View style={styles.seasonPill}><Icon icon={Award} size={11} color={Colors.secondary} /><ThemedText style={styles.seasonText}>{category === 'party' ? 'LIVE' : 'SEASON 04'}</ThemedText></View>
         </View>
 
-        {needsParty ? (
+        {offline ? (
+          <PartyNotice title="Sign in to compete" body="Rankings use real runners, so they need an account." />
+        ) : needsParty ? (
           <PartyNotice title="Join a party to see standings" body="Standings show once you're in a party." actionLabel="FIND A PARTY" onAction={() => router.push('/parties')} />
-        ) : !offline && query.isError ? (
+        ) : query.isError ? (
           <PartyNotice title="Couldn’t load the leaderboard" body={query.error.message} actionLabel="TRY AGAIN" onAction={() => void query.refetch()} />
-        ) : !offline && query.isPending ? (
+        ) : query.isPending ? (
           <PartyNotice loading title="Loading rankings…" />
         ) : entries.length === 0 ? (
           <PartyNotice title="No runners here yet" body="Capture some territory to get on the board." />
