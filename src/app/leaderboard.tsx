@@ -11,6 +11,7 @@ import { LeaderboardPodium } from '../components/leaderboard/LeaderboardPodium';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { getPartyRankings, MOCK_GLOBAL_RANKINGS, MOCK_NEARBY_RANKINGS } from '../data/mockLeaderboard';
 import { MOCK_PARTIES } from '../data/mockParties';
+import { useParty } from '../hooks/useParties';
 import { usePartyStore } from '../stores/usePartyStore';
 import { LeaderboardEntry } from '../types/user';
 
@@ -23,7 +24,9 @@ const CATEGORY_INFO = {
 export default function LeaderboardScreen() {
   const insets = useSafeAreaInsets();
   const [category, setCategory] = useState<LeaderboardCategory>('global');
-  const activeParty = usePartyStore((state) => state.activeParty);
+  // ponytail: still mock-backed; Task 6 rewires this screen to live leaderboards.
+  const activePartyId = usePartyStore((state) => state.activePartyId);
+  const { data: activeParty } = useParty(activePartyId ?? undefined);
   const party = activeParty ?? MOCK_PARTIES[0];
 
   const entries = useMemo<LeaderboardEntry[]>(() => {

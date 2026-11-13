@@ -1,8 +1,10 @@
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { fetchProfile } from '../services/auth';
+import { fetchParty } from '../services/parties';
 import { submitRun } from '../services/runs';
 import { useAuthStore } from '../stores/useAuthStore';
+import { usePartyStore } from '../stores/usePartyStore';
 import { useRunStore } from '../stores/useRunStore';
 import { queryKeys } from './useServerData';
 
@@ -17,10 +19,15 @@ async function uploadFinishedRun(queryClient: QueryClient) {
 
   setSubmission(session.id, { state: 'saving' });
   try {
-    const result = await submitRun(session);
+    const partyId = await livePartyId(queryClient);
+    const result = await submitRun(session, partyId);
     setSubmission(session.id, { state: 'saved', result });
     if (result.runId) {
       await Promise.all([
+        ...(partyId ? [
+          queryClient.invalidateQueries({ queryKey: queryKeys.party(partyId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.partyLeaderboard(partyId) }),
+        ] : []),
         queryClient.invalidateQueries({ queryKey: queryKeys.allCells }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allCellOwners }),
         queryClient.invalidateQueries({ queryKey: queryKeys.myStats }),
@@ -34,6 +41,17 @@ async function uploadFinishedRun(queryClient: QueryClient) {
       error: error instanceof Error ? error.message : 'Couldn’t save your run.',
     });
   }
+}
+
+/** Tag the run with the active party only while it's live (the server re-checks membership and window). */
+async function livePartyId(queryClient: QueryClient): Promise<string | null> {
+  const id = usePartyStore.getState().activePartyId;
+  if (!id) return null;
+  // fetchQuery, not getQueryData: the party entry is garbage-collected 5 min after its screens unmount (i.e. mid-run).
+  const party = await queryClient
+    .fetchQuery({ queryKey: queryKeys.party(id), queryFn: () => fetchParty(id) })
+    .catch(() => null);
+  return party?.status === 'in_progress' ? id : null;
 }
 
 async function refreshProfile() {

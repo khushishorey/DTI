@@ -10,26 +10,47 @@ import { Icon } from '../../components/common/Icon';
 import { Input } from '../../components/common/Input';
 import { ThemedText } from '../../components/common/ThemedText';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { PartyNotice, PartyOfflineNotice } from '../../components/party/PartyNotice';
+import { useJoinParty, useParties } from '../../hooks/useParties';
+import { isPartyMember, partyRoute } from '../../services/parties';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
-import { CURRENT_PLAYER_ID } from '../../data/mockParties';
+import { Party } from '../../types/party';
 
 export default function JoinPartyScreen() {
-  const parties = usePartyStore((state) => state.parties);
-  const joinParty = usePartyStore((state) => state.joinParty);
-  const joinPartyByCode = usePartyStore((state) => state.joinPartyByCode);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const partiesQuery = useParties();
+  const joinParty = useJoinParty();
+  const setActivePartyId = usePartyStore((state) => state.setActivePartyId);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const openParties = parties.filter((party) => party.visibility === 'public' && party.status !== 'completed' &&
-    (party.participants.length < party.maxParticipants || party.participants.some((player) => player.id === CURRENT_PLAYER_ID)));
+  const openParties = (partiesQuery.data ?? []).filter((party) => party.visibility === 'public' && party.status !== 'completed' &&
+    (party.participants.length < party.maxParticipants || isPartyMember(party, myUserId)));
 
-  const submitCode = () => {
-    const party = joinPartyByCode(code);
-    if (!party) {
-      setError('Could not join. Check the code, party capacity, and status.');
-      return;
-    }
-    router.replace(party.status === 'in_progress' ? '/parties/leaderboard' : '/parties/lobby');
+  const enter = (party: Party) => {
+    setActivePartyId(party.id);
+    router.replace(partyRoute(party.status));
   };
+
+  // Server errors ('Party is full', 'Party not found', 'Party has ended') go straight into the error slot.
+  const join = async (partyCode: string) => {
+    setError('');
+    try {
+      enter(await joinParty.mutateAsync(partyCode));
+    } catch (joinError) {
+      setError(joinError instanceof Error ? joinError.message : 'Could not join this party.');
+    }
+  };
+
+  if (offline) {
+    return (
+      <PartyPage>
+        <PartyScreenHeader title="Join a party" subtitle="Enter a code or join an open run." backTo="/parties" />
+        <PartyOfflineNotice />
+      </PartyPage>
+    );
+  }
 
   return (
     <PartyPage>
@@ -49,7 +70,7 @@ export default function JoinPartyScreen() {
           maxLength={8}
           error={error || undefined}
         />
-        <Button title="JOIN WITH CODE" size="lg" fullWidth disabled={code.trim().length < 4} onPress={submitCode} style={styles.joinButton} />
+        <Button title="JOIN WITH CODE" size="lg" fullWidth disabled={code.trim().length < 4} loading={joinParty.isPending} onPress={() => void join(code)} style={styles.joinButton} />
       </View>
 
       <View style={styles.sectionHeading}>
@@ -60,15 +81,14 @@ export default function JoinPartyScreen() {
         <Icon icon={Users} size={18} color={Colors.textSecondary} />
       </View>
 
-      {openParties.length ? openParties.map((party) => (
+      {partiesQuery.isPending ? <PartyNotice loading title="Loading parties…" /> : partiesQuery.isError ? (
+        <PartyNotice title="Couldn’t load parties" body={partiesQuery.error.message} actionLabel="TRY AGAIN" onAction={() => void partiesQuery.refetch()} />
+      ) : openParties.length ? openParties.map((party) => (
         <PartyCard
           key={party.id}
           party={party}
           actionLabel={party.status === 'in_progress' ? 'VIEW LIVE' : 'JOIN PARTY'}
-          onPress={() => {
-            joinParty(party.id);
-            router.replace(party.status === 'in_progress' ? '/parties/leaderboard' : '/parties/lobby');
-          }}
+          onPress={() => (isPartyMember(party, myUserId) ? enter(party) : void join(party.code))}
         />
       )) : (
         <View style={styles.emptyState}>

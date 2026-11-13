@@ -11,22 +11,39 @@ import { Icon } from '../../components/common/Icon';
 import { ThemedText } from '../../components/common/ThemedText';
 import { Avatar } from '../../components/common/Avatar';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { PartyLoadState } from '../../components/party/PartyNotice';
+import { useParty } from '../../hooks/useParties';
+import { usePartyLeaderboard } from '../../hooks/useServerData';
+import { partyRoute, partyStandings } from '../../services/parties';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
 
 const PODIUM_COLORS = [Colors.primary, Colors.textSecondary, Colors.competitorOrange];
 
 export default function PartyResultsScreen() {
-  const party = usePartyStore((state) => state.activeParty);
-  const clearActiveParty = usePartyStore((state) => state.clearActiveParty);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const partyId = usePartyStore((state) => state.activePartyId) ?? undefined;
+  const setActivePartyId = usePartyStore((state) => state.setActivePartyId);
+  const partyQuery = useParty(partyId);
+  const party = partyQuery.data;
+  const leaderboard = usePartyLeaderboard(partyId);
 
   useEffect(() => {
-    if (!party) router.replace('/parties');
-    else if (party.status === 'in_progress') router.replace('/parties/leaderboard');
-    else if (party.status === 'lobby') router.replace('/parties/lobby');
-  }, [party]);
+    if (!partyId && !offline) router.replace('/parties');
+    else if (party && party.status !== 'completed') router.replace(partyRoute(party.status));
+  }, [partyId, offline, party]);
 
-  if (!party) return null;
-  const standings = [...party.participants].sort((a, b) => b.score - a.score);
+  if (!party) {
+    return (
+      <PartyPage>
+        <PartyScreenHeader title="Party results" backTo="/parties" />
+        <PartyLoadState offline={offline} query={partyQuery} />
+      </PartyPage>
+    );
+  }
+  const standings = leaderboard.data
+    ? partyStandings(party, leaderboard.data)
+    : [...party.participants].sort((a, b) => b.score - a.score);
   const totalArea = standings.reduce((sum, player) => sum + player.territoryCapturedKm2, 0);
   const totalDistance = standings.reduce((sum, player) => sum + player.distanceCoveredKm, 0);
   const podium = [standings[1], standings[0], standings[2]];
@@ -77,7 +94,7 @@ export default function PartyResultsScreen() {
         ))}
       </View>
 
-      <Button title="BACK TO PARTIES" size="lg" fullWidth onPress={() => { clearActiveParty(); router.replace('/parties'); }} style={styles.backButton} />
+      <Button title="BACK TO PARTIES" size="lg" fullWidth onPress={() => { setActivePartyId(null); router.replace('/parties'); }} style={styles.backButton} />
     </PartyPage>
   );
 }

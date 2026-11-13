@@ -10,27 +10,66 @@ import { Button } from '../../components/common/Button';
 import { Icon } from '../../components/common/Icon';
 import { ThemedText } from '../../components/common/ThemedText';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { PartyNotice, PartyOfflineNotice } from '../../components/party/PartyNotice';
+import { useJoinParty, useParties } from '../../hooks/useParties';
+import { isListedParty, isPartyMember, partyRoute } from '../../services/parties';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
-import { PartyStatus } from '../../types/party';
-import { CURRENT_PLAYER_ID } from '../../data/mockParties';
+import { Party } from '../../types/party';
 
 type PartyFilter = 'all' | 'lobby' | 'live';
 
 export default function PartyDiscoveryScreen() {
-  const parties = usePartyStore((state) => state.parties);
-  const activeParty = usePartyStore((state) => state.activeParty);
-  const joinParty = usePartyStore((state) => state.joinParty);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const partiesQuery = useParties();
+  const joinParty = useJoinParty();
+  const activePartyId = usePartyStore((state) => state.activePartyId);
+  const setActivePartyId = usePartyStore((state) => state.setActivePartyId);
   const [filter, setFilter] = useState<PartyFilter>('all');
+  const [joinError, setJoinError] = useState('');
+  const parties = useMemo(() => partiesQuery.data ?? [], [partiesQuery.data]);
+  const activeParty = parties.find((party) => party.id === activePartyId) ?? null;
   const visibleParties = useMemo(
-    () => parties.filter((party) => party.visibility === 'public' && party.status !== 'completed' &&
-      (party.participants.length < party.maxParticipants || party.participants.some((player) => player.id === CURRENT_PLAYER_ID)) &&
+    () => parties.filter((party) => isListedParty(party, myUserId) &&
       (filter === 'all' || (filter === 'live' ? party.status === 'in_progress' : party.status === 'lobby'))),
-    [parties, filter],
+    [parties, filter, myUserId],
   );
 
-  const openParty = (partyId: string, status: PartyStatus) => {
-    joinParty(partyId);
-    router.push(status === 'in_progress' ? '/parties/leaderboard' : '/parties/lobby');
+  const openParty = async (party: Party) => {
+    setJoinError('');
+    try {
+      const joined = isPartyMember(party, myUserId) ? party : await joinParty.mutateAsync(party.code);
+      setActivePartyId(joined.id);
+      router.push(partyRoute(joined.status));
+    } catch (error) {
+      setJoinError(error instanceof Error ? error.message : 'Could not join this party.');
+    }
+  };
+
+  const renderList = () => {
+    if (offline) return <PartyOfflineNotice />;
+    if (partiesQuery.isPending) return <PartyNotice loading title="Loading parties…" />;
+    if (partiesQuery.isError) {
+      return <PartyNotice title="Couldn’t load parties" body={partiesQuery.error.message} actionLabel="TRY AGAIN" onAction={() => void partiesQuery.refetch()} />;
+    }
+    if (parties.length === 0) return <PartyNotice title="No parties yet — create one" body="Invite your crew to start a challenge." />;
+    if (visibleParties.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <ThemedText style={styles.emptyTitle}>No parties in this view</ThemedText>
+          <ThemedText style={styles.emptyBody}>Create a party and invite your crew to start a challenge.</ThemedText>
+        </View>
+      );
+    }
+    return visibleParties.map((party) => (
+      <PartyCard
+        key={party.id}
+        party={party}
+        actionLabel={isPartyMember(party, myUserId) ? 'OPEN' : party.status === 'in_progress' ? 'VIEW LIVE' : 'JOIN PARTY'}
+        onPress={() => void openParty(party)}
+      />
+    ));
   };
 
   return (
@@ -52,7 +91,7 @@ export default function PartyDiscoveryScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Active party: ${activeParty.name}`}
-            onPress={() => router.push(activeParty.status === 'in_progress' ? '/parties/leaderboard' : activeParty.status === 'completed' ? '/parties/results' : '/parties/lobby')}
+            onPress={() => router.push(partyRoute(activeParty.status))}
             style={styles.activePartyBanner}
           >
             <View style={styles.activeDot} />
@@ -98,19 +137,8 @@ export default function PartyDiscoveryScreen() {
           ))}
         </View>
 
-        {visibleParties.length > 0 ? visibleParties.map((party) => (
-          <PartyCard
-            key={party.id}
-            party={party}
-            actionLabel={party.status === 'in_progress' ? 'VIEW LIVE' : 'JOIN PARTY'}
-            onPress={() => openParty(party.id, party.status)}
-          />
-        )) : (
-          <View style={styles.emptyState}>
-            <ThemedText style={styles.emptyTitle}>No parties in this view</ThemedText>
-            <ThemedText style={styles.emptyBody}>Create a party and invite your crew to start a challenge.</ThemedText>
-          </View>
-        )}
+        {joinError ? <ThemedText style={styles.joinError} accessibilityRole="alert">{joinError}</ThemedText> : null}
+        {renderList()}
       </PartyPage>
 
       <AppBottomNavigation activeTab="parties" />
@@ -174,4 +202,5 @@ const styles = StyleSheet.create({
   emptyState: { padding: Spacing.xl, alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
   emptyTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.base, fontWeight: Typography.weights.semibold },
   emptyBody: { color: Colors.textSecondary, fontSize: Typography.sizes.xs, textAlign: 'center', marginTop: Spacing.xs },
+  joinError: { color: Colors.danger, fontSize: Typography.sizes.xs, marginBottom: Spacing.sm },
 });

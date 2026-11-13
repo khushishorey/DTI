@@ -1,4 +1,4 @@
-import { partyFromRows } from '../../services/parties';
+import { isListedParty, partyFromRows, partyRoute, partyStandings } from '../../services/parties';
 import { leaderboardFromRows } from '../../services/leaderboard';
 import { nearbyRunnersFromTerritories } from '../../services/players';
 import { deriveAchievements } from '../achievements';
@@ -30,6 +30,35 @@ describe('partyFromRows', () => {
     const party = partyFromRows({ ...partyRow, started_at: null, ends_at: null, status: 'lobby' }, []);
     expect(party.startedAt).toBeUndefined();
     expect(party.endsAt).toBeUndefined();
+  });
+});
+
+describe('party list helpers', () => {
+  const live = partyFromRows(partyRow, members);
+  it('lists open public parties and any party I belong to', () => {
+    expect(isListedParty(live, 'stranger')).toBe(true);
+    const done = { ...live, status: 'completed' as const };
+    expect(isListedParty(done, 'stranger')).toBe(false);
+    expect(isListedParty(done, 'u2')).toBe(true);
+    const hidden = { ...live, visibility: 'private' as const };
+    expect(isListedParty(hidden, 'stranger')).toBe(false);
+    expect(isListedParty(hidden, undefined)).toBe(false);
+    expect(isListedParty(hidden, 'u1')).toBe(true);
+  });
+  it('routes by status', () => {
+    expect(partyRoute('lobby')).toBe('/parties/lobby');
+    expect(partyRoute('in_progress')).toBe('/parties/leaderboard');
+    expect(partyRoute('completed')).toBe('/parties/results');
+  });
+  it('maps ranked leaderboard rows onto party colours and host', () => {
+    const entries = leaderboardFromRows([
+      { rank: 1, user_id: 'u2', username: 'Guest', avatar_url: null, cells_captured: 1, distance_m: 2500, score: 50 },
+      { rank: 2, user_id: 'ghost', username: 'Gone', avatar_url: null, cells_captured: 0, distance_m: 0, score: 0 },
+    ]);
+    const standings = partyStandings(live, entries);
+    expect(standings.map((p) => p.id)).toEqual(['u2', 'ghost']);
+    expect(standings[0]).toMatchObject({ color: '#000', isHost: false, score: 50, distanceCoveredKm: 2.5 });
+    expect(standings[1].color).toBe('#999999');
   });
 });
 

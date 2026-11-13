@@ -1,7 +1,8 @@
 import { getHexagonAreaAvg } from 'h3-js';
 import { TERRITORY_RESOLUTION } from '../lib/h3';
 import { requireSupabase } from '../lib/supabase';
-import { CreatePartyInput, Party, PartyGameMode, PartyStatus, PartyVisibility } from '../types/party';
+import { CreatePartyInput, Party, PartyGameMode, PartyParticipant, PartyStatus, PartyVisibility } from '../types/party';
+import { LeaderboardEntry } from '../types/user';
 
 const AVG_CELL_KM2 = getHexagonAreaAvg(TERRITORY_RESOLUTION, 'km2');
 
@@ -55,7 +56,36 @@ export function partyFromRows(row: PartyRow, members: MemberRow[]): Party {
   };
 }
 
-const PARTY_SELECT = '*, party_members(user_id, score, cells_captured, distance_m, profiles(username, color, avatar_url))';
+export const isPartyMember = (party: Party, userId: string | undefined) =>
+  Boolean(userId) && party.participants.some((p) => p.id === userId);
+
+/** Discovery list: open public parties plus any party the user already belongs to. */
+export const isListedParty = (party: Party, userId: string | undefined) =>
+  (party.visibility === 'public' && party.status !== 'completed') || isPartyMember(party, userId);
+
+export const partyRoute = (status: PartyStatus) =>
+  status === 'in_progress' ? '/parties/leaderboard' as const
+    : status === 'completed' ? '/parties/results' as const
+      : '/parties/lobby' as const;
+
+/** Ranked leaderboard rows as participants, keeping each runner's colour and host badge from the party. */
+export function partyStandings(party: Party, entries: LeaderboardEntry[]): PartyParticipant[] {
+  return entries.map((entry) => {
+    const member = party.participants.find((p) => p.id === entry.userId);
+    return {
+      id: entry.userId,
+      username: entry.username,
+      avatarUrl: entry.avatarUrl,
+      isHost: entry.userId === party.hostId,
+      color: member?.color ?? '#999999',
+      score: entry.score,
+      territoryCapturedKm2: entry.territoryCapturedKm2,
+      distanceCoveredKm: entry.distanceKm,
+    };
+  });
+}
+
+const PARTY_SELECT ='*, party_members(user_id, score, cells_captured, distance_m, profiles(username, color, avatar_url))';
 type PartyWithMembers = PartyRow & { party_members: MemberRow[] };
 
 // Supabase errors are plain objects; surface the SQL message ('Party is full', ...) unchanged.

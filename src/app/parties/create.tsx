@@ -9,6 +9,9 @@ import { Icon } from '../../components/common/Icon';
 import { Input } from '../../components/common/Input';
 import { ThemedText } from '../../components/common/ThemedText';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { PartyOfflineNotice } from '../../components/party/PartyNotice';
+import { useCreateParty } from '../../hooks/useParties';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
 import { PartyGameMode, PartyVisibility } from '../../types/party';
 
@@ -20,7 +23,10 @@ const GAME_MODES: { value: PartyGameMode; label: string; description: string; ic
 ];
 
 export default function CreatePartyScreen() {
-  const createParty = usePartyStore((state) => state.createParty);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const createParty = useCreateParty();
+  const setActivePartyId = usePartyStore((state) => state.setActivePartyId);
+  const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [visibility, setVisibility] = useState<PartyVisibility>('public');
   const [gameMode, setGameMode] = useState<PartyGameMode>('territory_control');
@@ -33,12 +39,26 @@ export default function CreatePartyScreen() {
   const customIsValid = !hasCustomDuration || (Number.isInteger(customValue) && customValue >= 5 && customValue <= 10080);
   const canCreate = name.trim().length >= 3 && customIsValid && selectedDuration > 0;
 
-  const handleCreate = () => {
-    if (!canCreate) return;
-    const party = createParty({ name, visibility, gameMode, durationMinutes: selectedDuration, maxParticipants });
-    router.replace('/parties/lobby');
-    return party;
+  const handleCreate = async () => {
+    if (!canCreate || createParty.isPending) return;
+    setError('');
+    try {
+      const party = await createParty.mutateAsync({ name, visibility, gameMode, durationMinutes: selectedDuration, maxParticipants });
+      setActivePartyId(party.id);
+      router.replace('/parties/lobby');
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Could not create the party.');
+    }
   };
+
+  if (offline) {
+    return (
+      <PartyPage>
+        <PartyScreenHeader title="Create a party" subtitle="Set the rules, then bring your crew." backTo="/parties" />
+        <PartyOfflineNotice />
+      </PartyPage>
+    );
+  }
 
   return (
     <PartyPage>
@@ -52,6 +72,7 @@ export default function CreatePartyScreen() {
         maxLength={32}
         returnKeyType="done"
         hint={`${name.length}/32 characters · At least 3 characters`}
+        error={error || undefined}
       />
 
       <SectionTitle title="Who can join?" subtitle="You can change this before the run starts." />
@@ -136,7 +157,7 @@ export default function CreatePartyScreen() {
         </Pressable>
       </View>
 
-      <Button title="CREATE PARTY" size="lg" fullWidth disabled={!canCreate} onPress={handleCreate} style={styles.createButton} />
+      <Button title="CREATE PARTY" size="lg" fullWidth disabled={!canCreate} loading={createParty.isPending} onPress={() => void handleCreate()} style={styles.createButton} />
     </PartyPage>
   );
 }

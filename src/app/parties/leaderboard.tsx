@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { Clock3, Flag, Trophy } from 'lucide-react-native';
+import { PartyLoadState } from '../../components/party/PartyNotice';
 import { PartyPage } from '../../components/party/PartyPage';
 import { PartyParticipantRow } from '../../components/party/PartyParticipantRow';
 import { PartyScreenHeader } from '../../components/party/PartyScreenHeader';
@@ -10,51 +11,78 @@ import { Icon } from '../../components/common/Icon';
 import { Modal } from '../../components/common/Modal';
 import { ThemedText } from '../../components/common/ThemedText';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import { useFinishParty, useParty, usePartyRealtime } from '../../hooks/useParties';
+import { usePartyLeaderboard } from '../../hooks/useServerData';
+import { partyRoute, partyStandings } from '../../services/parties';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
 import { gameModeLabel } from '../../components/party/PartyCard';
 
+/** Our clock can run ahead of the server's; wait this long before asking again. */
+const NOT_ENDED_RETRY_MS = 3000;
+
 export default function PartyLeaderboardScreen() {
-  const party = usePartyStore((state) => state.activeParty);
-  const completeCompetition = usePartyStore((state) => state.completeCompetition);
+  const offline = useAuthStore((state) => state.status === 'offline');
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const partyId = usePartyStore((state) => state.activePartyId) ?? undefined;
+  const partyQuery = useParty(partyId);
+  const party = partyQuery.data;
+  const leaderboard = usePartyLeaderboard(partyId);
+  const finishParty = useFinishParty();
+  const finishRequested = useRef(false);
   const [now, setNow] = useState(Date.now());
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [error, setError] = useState('');
+  usePartyRealtime(partyId);
 
   useEffect(() => {
-    if (!party) {
-      router.replace('/parties');
-      return;
-    }
-    if (party.status === 'completed') {
-      router.replace('/parties/results');
-      return;
-    }
-    if (party.status !== 'in_progress') {
-      router.replace('/parties/lobby');
-      return;
-    }
+    if (!partyId && !offline) router.replace('/parties');
+    else if (party && party.status !== 'in_progress') router.replace(partyRoute(party.status));
+  }, [partyId, offline, party]);
 
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      const latestParty = usePartyStore.getState().activeParty;
-      if (latestParty?.endsAt && latestParty.endsAt <= current) {
-        usePartyStore.getState().completeCompetition();
-      }
-    }, 1000);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [party?.id, party?.status]);
+  }, []);
 
-  if (!party) return null;
+  const finishCompetition = async () => {
+    if (!party || finishRequested.current) return;
+    finishRequested.current = true;
+    setError('');
+    try {
+      await finishParty.mutateAsync(party.id); // invalidates the party; the status effect routes to results
+    } catch (finishError) {
+      const message = finishError instanceof Error ? finishError.message : 'Could not end the competition.';
+      if (message === 'Party has not ended yet') {
+        setTimeout(() => { finishRequested.current = false; }, NOT_ENDED_RETRY_MS);
+      } else {
+        finishRequested.current = false;
+        setError(message);
+      }
+    }
+  };
+
+  const timeIsUp = party?.status === 'in_progress' && party.endsAt !== undefined && party.endsAt <= now;
+  useEffect(() => {
+    if (timeIsUp && !error) void finishCompetition();
+    // finishCompetition is guarded by finishRequested; `now` re-runs this after a retry delay.
+  }, [timeIsUp, now, error]);
+
+  if (!party) {
+    return (
+      <PartyPage>
+        <PartyScreenHeader title="Live leaderboard" backTo="/parties" />
+        <PartyLoadState offline={offline} query={partyQuery} />
+      </PartyPage>
+    );
+  }
   const remainingSeconds = Math.max(0, Math.ceil(((party.endsAt ?? now) - now) / 1000));
   const totalSeconds = party.durationMinutes * 60;
   const elapsedRatio = Math.min(1, Math.max(0, 1 - remainingSeconds / totalSeconds));
-  const isLeader = party.hostId === 'player-me';
-  const participants = [...party.participants].sort((a, b) => b.score - a.score);
-
-  const finishCompetition = () => {
-    setConfirmFinish(false);
-    completeCompetition();
-  };
+  const isLeader = party.hostId === myUserId;
+  const participants = leaderboard.data
+    ? partyStandings(party, leaderboard.data)
+    : [...party.participants].sort((a, b) => b.score - a.score);
 
   return (
     <PartyPage>
@@ -97,8 +125,10 @@ export default function PartyLeaderboardScreen() {
         <ThemedText style={styles.liveNoteText}>Scores update as runners capture ground and cover distance.</ThemedText>
       </View>
 
+      {error ? <ThemedText style={styles.errorText} accessibilityRole="alert">{error}</ThemedText> : null}
+
       {isLeader ? (
-        <Button title="END COMPETITION" variant="destructive" onPress={() => setConfirmFinish(true)} style={styles.endButton} />
+        <Button title="END COMPETITION" variant="destructive" loading={finishParty.isPending} onPress={() => setConfirmFinish(true)} style={styles.endButton} />
       ) : null}
 
       <Modal
@@ -107,7 +137,7 @@ export default function PartyLeaderboardScreen() {
         title="End the competition?"
         description="The current standings will be saved and everyone will see the results."
         dismissOnBackdrop={false}
-        primaryAction={{ label: 'End competition', variant: 'destructive', onPress: finishCompetition }}
+        primaryAction={{ label: 'End competition', variant: 'destructive', onPress: () => { setConfirmFinish(false); void finishCompetition(); } }}
         secondaryAction={{ label: 'Keep playing', onPress: () => setConfirmFinish(false) }}
       />
     </PartyPage>
@@ -151,4 +181,5 @@ const styles = StyleSheet.create({
   liveNote: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md, backgroundColor: Colors.surfaceElevated, borderRadius: Radius.md },
   liveNoteText: { flex: 1, color: Colors.textSecondary, fontSize: 12 },
   endButton: { marginTop: Spacing.lg },
+  errorText: { color: Colors.danger, fontSize: 12, marginTop: Spacing.md },
 });
