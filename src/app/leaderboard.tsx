@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Award, Globe2, MapPin, Trophy, Users } from 'lucide-react-native';
 import { AppBottomNavigation } from '../components/common/AppBottomNavigation';
@@ -9,11 +10,18 @@ import { LeaderboardCategoryTabs, LeaderboardCategory } from '../components/lead
 import { LeaderboardEntryRow } from '../components/leaderboard/LeaderboardEntryRow';
 import { LeaderboardPodium } from '../components/leaderboard/LeaderboardPodium';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { DEMO_BOUNDS } from '../constants/map';
 import { getPartyRankings, MOCK_GLOBAL_RANKINGS, MOCK_NEARBY_RANKINGS } from '../data/mockLeaderboard';
 import { MOCK_PARTIES } from '../data/mockParties';
 import { useParty } from '../hooks/useParties';
+import { useGlobalLeaderboard, useNearbyLeaderboard, usePartyLeaderboard } from '../hooks/useServerData';
+import { PartyNotice } from '../components/party/PartyNotice';
+import { snapBounds } from '../services/territory';
+import { useAuthStore } from '../stores/useAuthStore';
 import { usePartyStore } from '../stores/usePartyStore';
 import { LeaderboardEntry } from '../types/user';
+
+const NEARBY_BOUNDS = snapBounds(DEMO_BOUNDS); // no stored map bounds yet
 
 const CATEGORY_INFO = {
   global: { title: 'Global leaders', subtitle: 'The top runners across run.io.', icon: Globe2 },
@@ -24,16 +32,26 @@ const CATEGORY_INFO = {
 export default function LeaderboardScreen() {
   const insets = useSafeAreaInsets();
   const [category, setCategory] = useState<LeaderboardCategory>('global');
-  // ponytail: still mock-backed; Task 6 rewires this screen to live leaderboards.
+  const offline = useAuthStore((state) => state.status === 'offline');
   const activePartyId = usePartyStore((state) => state.activePartyId);
   const { data: activeParty } = useParty(activePartyId ?? undefined);
-  const party = activeParty ?? MOCK_PARTIES[0];
+  const globalQuery = useGlobalLeaderboard();
+  const nearbyQuery = useNearbyLeaderboard(NEARBY_BOUNDS);
+  const partyQuery = usePartyLeaderboard(activePartyId ?? undefined);
 
+  const needsParty = category === 'party' && !activePartyId && !offline;
+  const query = category === 'nearby' ? nearbyQuery : category === 'party' ? partyQuery : globalQuery;
+  const partyName = offline ? MOCK_PARTIES[0].name : activeParty?.name ?? 'Your party';
+
+  // Offline demo keeps the mock rankings; online never falls back to them.
   const entries = useMemo<LeaderboardEntry[]>(() => {
-    if (category === 'nearby') return MOCK_NEARBY_RANKINGS;
-    if (category === 'party') return getPartyRankings(party);
-    return MOCK_GLOBAL_RANKINGS;
-  }, [category, party]);
+    if (offline) {
+      if (category === 'nearby') return MOCK_NEARBY_RANKINGS;
+      if (category === 'party') return getPartyRankings(MOCK_PARTIES[0]);
+      return MOCK_GLOBAL_RANKINGS;
+    }
+    return query.data ?? [];
+  }, [offline, category, query.data]);
 
   const info = CATEGORY_INFO[category];
   const CategoryIcon = info.icon;
@@ -60,31 +78,39 @@ export default function LeaderboardScreen() {
           <View style={styles.categoryIcon}><Icon icon={CategoryIcon} size={16} color={Colors.primary} strokeWidth={2.1} /></View>
           <View style={styles.categoryCopy}>
             <ThemedText style={styles.categoryTitle}>{info.title}</ThemedText>
-            <ThemedText style={styles.categorySubtitle}>{category === 'party' ? party.name : info.subtitle}</ThemedText>
+            <ThemedText style={styles.categorySubtitle}>{category === 'party' ? partyName : info.subtitle}</ThemedText>
           </View>
           <View style={styles.seasonPill}><Icon icon={Award} size={11} color={Colors.secondary} /><ThemedText style={styles.seasonText}>{category === 'party' ? 'LIVE' : 'SEASON 04'}</ThemedText></View>
         </View>
 
-        <View style={styles.podiumCard}>
-          <LeaderboardPodium entries={leaders} />
-        </View>
-
-        <View style={styles.listHeader}>
-          <ThemedText style={styles.listTitle}>{category === 'party' ? 'Party rankings' : 'Rankings'}</ThemedText>
-          <View style={styles.columnLabels}>
-            <ThemedText style={styles.columnLabel}>TERRITORY · DISTANCE</ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.rankingList}>
-          {remainingEntries.length > 0 ? remainingEntries.map((entry) => (
-            <LeaderboardEntryRow key={entry.userId} entry={entry} />
-          )) : (
-            <View style={styles.emptyRows}>
-              {entries.slice(0, 3).map((entry) => <LeaderboardEntryRow key={entry.userId} entry={entry} />)}
+        {needsParty ? (
+          <PartyNotice title="Join a party to see standings" body="Standings show once you're in a party." actionLabel="FIND A PARTY" onAction={() => router.push('/parties')} />
+        ) : !offline && query.isError ? (
+          <PartyNotice title="Couldn’t load the leaderboard" body={query.error.message} actionLabel="TRY AGAIN" onAction={() => void query.refetch()} />
+        ) : !offline && query.isPending ? (
+          <PartyNotice loading title="Loading rankings…" />
+        ) : entries.length === 0 ? (
+          <PartyNotice title="No runners here yet" body="Capture some territory to get on the board." />
+        ) : (
+          <>
+            <View style={styles.podiumCard}>
+              <LeaderboardPodium entries={leaders} />
             </View>
-          )}
-        </View>
+
+            <View style={styles.listHeader}>
+              <ThemedText style={styles.listTitle}>{category === 'party' ? 'Party rankings' : 'Rankings'}</ThemedText>
+              <View style={styles.columnLabels}>
+                <ThemedText style={styles.columnLabel}>TERRITORY · DISTANCE</ThemedText>
+              </View>
+            </View>
+
+            {remainingEntries.length > 0 ? (
+              <View style={styles.rankingList}>
+                {remainingEntries.map((entry) => <LeaderboardEntryRow key={entry.userId} entry={entry} />)}
+              </View>
+            ) : null}
+          </>
+        )}
         <View style={styles.scoreHint}>
           <Icon icon={Trophy} size={13} color={Colors.textMuted} />
           <ThemedText style={styles.scoreHintText}>Score combines territory captured, distance, and competition wins.</ThemedText>
@@ -116,7 +142,6 @@ const styles = StyleSheet.create({
   columnLabels: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   columnLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.6 },
   rankingList: { overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg },
-  emptyRows: { marginTop: -Spacing.md },
   scoreHint: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.xs, paddingTop: Spacing.md },
   scoreHintText: { flex: 1, color: Colors.textMuted, fontSize: 11, lineHeight: 16 },
 });
