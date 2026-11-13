@@ -10,6 +10,8 @@ import { ThemedText } from '../components/common/ThemedText';
 import { RunMapView } from '../components/map/RunMapView';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { useRunTracker } from '../hooks/useRunTracker';
+import { useCellOwner } from '../hooks/useServerData';
+import { useAuthStore } from '../stores/useAuthStore';
 import { MIN_POINTS_TO_CAPTURE, cellsAreaKm2 } from '../lib/h3';
 import { useRunStore } from '../stores/useRunStore';
 import { formatArea } from '../utils/formatters';
@@ -23,6 +25,8 @@ export default function RunScreen() {
   const endRun = useRunStore((state) => state.endRun);
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
   const { error: trackingError } = useRunTracker();
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const { data: currentCellOwner } = useCellOwner(session?.currentCell);
 
   useEffect(() => {
     if (!session) router.replace('/');
@@ -41,6 +45,14 @@ export default function RunScreen() {
   const currentCellPoints = session.currentCell ? session.cellPointCounts[session.currentCell] ?? 0 : 0;
   const currentCellCaptured = currentCellPoints >= MIN_POINTS_TO_CAPTURE;
   const captureProgress = Math.min(currentCellPoints / MIN_POINTS_TO_CAPTURE, 1);
+  // Before the run is saved, "claimed" is the app's estimate; the server has the final say.
+  const captureLabel = currentCellCaptured
+    ? 'CELL CLAIMED'
+    : !currentCellOwner
+      ? 'CAPTURING'
+      : currentCellOwner.ownerId === myUserId
+        ? 'DEFENDING'
+        : `STEAL · ${currentCellOwner.ownerName.toUpperCase()}`;
   const capturedCount = session.capturedCells.length;
   const captureTitle = trackingError
     ? trackingError === 'permission-denied'
@@ -93,8 +105,8 @@ export default function RunScreen() {
             <ThemedText style={styles.captureName}>{captureTitle}</ThemedText>
           </View>
           <View style={styles.captureProgressWrap}>
-            <ThemedText style={styles.capturePercent}>
-              {currentCellCaptured ? 'CELL CLAIMED' : 'CAPTURING'}
+            <ThemedText style={styles.capturePercent} numberOfLines={1}>
+              {captureLabel}
             </ThemedText>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${Math.round(captureProgress * 100)}%` }]} />
@@ -345,7 +357,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   captureProgressWrap: {
-    width: 90,
+    width: 110,
   },
   capturePercent: {
     color: Colors.primary,

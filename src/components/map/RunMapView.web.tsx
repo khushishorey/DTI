@@ -28,7 +28,7 @@ export function RunMapView({ route, capturedCells = [] }: RunMapViewProps) {
   return (
     <MapCanvas onLayout={onLayout} accessibilityLabel="Running route and captured cells">
       {hexes.length > 0 && size.width > 0 ? (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={size.width} height={size.height} style={StyleSheet.absoluteFill} pointerEvents="none">
           {hexes.map((hex, index) => (
             <Polygon
               key={capturedCells[index]}

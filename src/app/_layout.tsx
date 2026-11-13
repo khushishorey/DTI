@@ -4,6 +4,11 @@ import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { Colors } from '../constants/theme';
 import { useAuthStore } from '../stores/useAuthStore';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+});
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -46,6 +51,7 @@ export default function RootLayout() {
   const previousStatus = useRef(status);
   useEffect(() => {
     if (status === 'signed-out' && previousStatus.current !== 'signed-out') {
+      queryClient.clear(); // never show the previous player's data to the next one
       const launch = launchPath.current;
       const openedOnAuthPage = previousStatus.current === 'loading' && isAuthPath(launch);
       router.replace(openedOnAuthPage ? launch : '/get-started');
@@ -58,30 +64,32 @@ export default function RootLayout() {
   const signedOut = status === 'signed-out' || status === 'loading';
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Colors.background },
-          animation: 'fade',
-        }}
-      >
-        <Stack.Protected guard={canUseApp}>
-          {APP_SCREENS.map((name) => (
-            <Stack.Screen key={name} name={name} />
-          ))}
-        </Stack.Protected>
-        <Stack.Protected guard={signedOut}>
-          <Stack.Screen name="(auth)/get-started" />
-          <Stack.Screen name="(auth)/login" />
-          <Stack.Screen name="(auth)/register" />
-        </Stack.Protected>
-        <Stack.Protected guard={status === 'needs-setup'}>
-          <Stack.Screen name="(auth)/setup" />
-        </Stack.Protected>
-      </Stack>
-    </View>
+    <QueryClientProvider client={queryClient}>
+      <View style={styles.container}>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: Colors.background },
+            animation: 'fade',
+          }}
+        >
+          <Stack.Protected guard={canUseApp}>
+            {APP_SCREENS.map((name) => (
+              <Stack.Screen key={name} name={name} />
+            ))}
+          </Stack.Protected>
+          <Stack.Protected guard={signedOut}>
+            <Stack.Screen name="(auth)/get-started" />
+            <Stack.Screen name="(auth)/login" />
+            <Stack.Screen name="(auth)/register" />
+          </Stack.Protected>
+          <Stack.Protected guard={status === 'needs-setup'}>
+            <Stack.Screen name="(auth)/setup" />
+          </Stack.Protected>
+        </Stack>
+      </View>
+    </QueryClientProvider>
   );
 }
 

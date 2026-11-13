@@ -3,7 +3,7 @@
 // Local development only — the demo password is not a secret.
 const fs = require('fs');
 const path = require('path');
-const { latLngToCell, gridDisk } = require('h3-js');
+const { latLngToCell, gridDisk, cellToLatLng } = require('h3-js');
 
 const CENTER = { lat: 37.78825, lng: -122.4324 }; // matches src/data/mockRunRoute.ts
 const RES = 10;
@@ -37,8 +37,13 @@ for (const p of players) {
   cells.forEach((c) => taken.add(c));
   sql.push(`-- ${p.username}: ${cells.length} cells`);
   sql.push(
-    `insert into public.cells (h3, owner_id, captured_at) values\n` +
-      cells.map((c, i) => `  ('${c}', '${p.id}', now() - interval '${i + 1} hours')`).join(',\n') +
+    `insert into public.cells (h3, owner_id, captured_at, center_lat, center_lng) values\n` +
+      cells
+        .map((c, i) => {
+          const [lat, lng] = cellToLatLng(c);
+          return `  ('${c}', '${p.id}', now() - interval '${i + 1} hours', ${lat.toFixed(7)}, ${lng.toFixed(7)})`;
+        })
+        .join(',\n') +
       ';',
   );
 }

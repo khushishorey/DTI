@@ -3,6 +3,7 @@ import { haversineMeters } from '../lib/geo';
 import { MIN_POINTS_TO_CAPTURE, cellsAreaKm2, pointToCell } from '../lib/h3';
 import { rejectReason, TrackPoint } from '../lib/tracking/filterPoints';
 import { defaultTrackingMode, TrackingMode } from '../lib/tracking/sources';
+import type { RunResult } from '../services/runs';
 import { PaceSample, RunSession, RunStatus } from '../types/run';
 
 /** Pace is averaged over this trailing window so a single GPS wobble doesn't swing it. */
@@ -10,9 +11,19 @@ const PACE_WINDOW_MS = 30_000;
 /** Below this distance in the window the pace is too noisy to show. */
 const MIN_PACE_WINDOW_METERS = 15;
 
+/** Upload state of the finished run (see src/hooks/useRunSubmission.ts). */
+export type RunSubmission =
+  | { state: 'idle' }
+  | { state: 'saving' }
+  | { state: 'saved'; result: RunResult }
+  | { state: 'failed'; error: string };
+
 interface RunState {
   currentSession: RunSession | null;
   status: RunStatus;
+  submission: RunSubmission;
+  /** Ignored if another run has started since `sessionId` (a late response for an old run). */
+  setSubmission: (sessionId: string, submission: RunSubmission) => void;
   /** Starts a run; tracking defaults to real GPS on phones and the simulator on web. */
   startRun: (trackingMode?: TrackingMode) => void;
   pauseRun: () => void;
@@ -27,10 +38,15 @@ interface RunState {
 export const useRunStore = create<RunState>((set) => ({
   currentSession: null,
   status: 'idle',
+  submission: { state: 'idle' },
+
+  setSubmission: (sessionId, submission) =>
+    set((state) => (state.currentSession?.id === sessionId ? { submission } : state)),
 
   startRun: (trackingMode = defaultTrackingMode()) =>
     set({
       status: 'running',
+      submission: { state: 'idle' },
       currentSession: {
         id: `run-${Date.now()}`,
         startTime: Date.now(),
@@ -119,7 +135,7 @@ export const useRunStore = create<RunState>((set) => ({
           distanceMeters,
           currentPaceSecondsPerKm: rollingPace(paceWindow) ?? session.currentPaceSecondsPerKm,
           route: [...session.route, { latitude: point.latitude, longitude: point.longitude }],
-          trackPoints: [...session.trackPoints, point],
+          trackPoints: [...session.trackPoints, { ...point, segmentStart: session.startsNewSegment }],
           cellPointCounts: { ...session.cellPointCounts, [cell]: count },
           capturedCells,
           currentCell: cell,

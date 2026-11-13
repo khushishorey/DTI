@@ -22,6 +22,7 @@ Press `w` for web, or scan the QR code with a development build. Without Supabas
    npx supabase login
    npx supabase link --project-ref <your-project-ref>
    npx supabase db push
+   npx supabase functions deploy submit-run
    ```
 4. Restart `npx expo start`. The app now opens on the welcome / sign-up screens.
 
@@ -36,6 +37,10 @@ npx supabase db reset   # applies migrations + supabase/seed.sql
 
 The seed adds 4 demo players with territory around the demo map area. They log in as `<username>@demo.run.io` with password `runio-demo-123` (local only). Regenerate it with `node scripts/generate-seed.cjs`.
 
+## How a run is saved
+
+When a run ends, the app sends its GPS points to the `submit-run` Edge Function ([supabase/functions/submit-run](supabase/functions/submit-run/index.ts)). The function re-checks every point with the rules in [`_shared/runScoring.ts`](supabase/functions/_shared/runScoring.ts) and works out the captured cells itself. It then calls the `apply_run()` database function, which in one transaction saves the run, takes over the cells, records who they were taken from and awards XP. The app never writes runs or cells directly.
+
 ## GPS and territory
 
 - **Tracking** (`src/lib/tracking/`): `expo-location` in the foreground. Points with accuracy worse than 25 m, implied speed above 25 km/h, or a mocked location are dropped. Set `EXPO_PUBLIC_TRACKING_MODE=simulated` to replay a route indoors.
@@ -47,7 +52,7 @@ The seed adds 4 demo players with territory around the demo map area. They log i
 | Command | What it does |
 |---|---|
 | `npm start` | Expo dev server |
-| `npm test` | Jest unit tests (geo, H3, GPS filter) |
+| `npm test` | Jest unit tests (geo, H3, GPS filter, server run scoring, data adapters) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | `expo lint` |
 

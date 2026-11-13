@@ -1,18 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MapView, { MapStyleElement, Region } from 'react-native-maps';
 import { StyleSheet } from 'react-native';
+import * as Location from 'expo-location';
+import { DEMO_REGION, regionToBounds } from '../../constants/map';
+import type { Bounds } from '../../services/territory';
 import { MOCK_TERRITORIES } from '../../data/mockTerritories';
 import { MOCK_NEARBY_PLAYERS } from '../../data/mockPlayers';
 import { Territory } from '../../types/territory';
 import { CurrentPlayerMarker, PlayerMarkers } from './PlayerMarkers';
 import { TerritoryOverlays } from './TerritoryOverlays';
 
-const INITIAL_REGION: Region = {
-  latitude: 37.7874,
-  longitude: -122.4315,
-  latitudeDelta: 0.012,
-  longitudeDelta: 0.010,
-};
+const INITIAL_REGION: Region = DEMO_REGION;
 
 export const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#141B18' }] },
@@ -35,6 +33,8 @@ interface MapHomeViewProps {
   territories?: Territory[];
   players?: typeof MOCK_NEARBY_PLAYERS;
   centerOnLocationKey?: number;
+  /** Called with the visible area whenever the map settles, to load cells in view. */
+  onBoundsChange?: (bounds: Bounds) => void;
 }
 
 export function MapHomeView({
@@ -42,14 +42,39 @@ export function MapHomeView({
   territories = MOCK_TERRITORIES,
   players = MOCK_NEARBY_PLAYERS,
   centerOnLocationKey = 0,
+  onBoundsChange,
 }: MapHomeViewProps) {
   const mapRef = useRef<MapView>(null);
+  const [userRegion, setUserRegion] = useState<Region | null>(null);
+
+  // Open on the player's real position when location permission was already granted
+  // (we don't prompt here; the run screen asks when it's needed).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { granted } = await Location.getForegroundPermissionsAsync();
+      if (!granted) return;
+      const position = await Location.getLastKnownPositionAsync();
+      if (!position || cancelled) return;
+      const region = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: INITIAL_REGION.latitudeDelta,
+        longitudeDelta: INITIAL_REGION.longitudeDelta,
+      };
+      setUserRegion(region);
+      mapRef.current?.animateToRegion(region, 350);
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (centerOnLocationKey > 0) {
-      mapRef.current?.animateToRegion(INITIAL_REGION, 350);
+      mapRef.current?.animateToRegion(userRegion ?? INITIAL_REGION, 350);
     }
-  }, [centerOnLocationKey]);
+  }, [centerOnLocationKey, userRegion]);
 
   return (
     <MapView
@@ -66,9 +91,12 @@ export function MapHomeView({
       rotateEnabled={false}
       pitchEnabled={false}
       accessibilityLabel="Territory map"
+      showsUserLocation={Boolean(userRegion)}
+      onMapReady={() => onBoundsChange?.(regionToBounds(INITIAL_REGION))}
+      onRegionChangeComplete={(region) => onBoundsChange?.(regionToBounds(region))}
     >
       <TerritoryOverlays territories={territories} onSelect={onSelectTerritory} />
-      <CurrentPlayerMarker />
+      {userRegion ? null : <CurrentPlayerMarker />}
       <PlayerMarkers players={players} />
     </MapView>
   );

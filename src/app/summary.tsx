@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Award, Footprints, MapPin, Timer } from 'lucide-react-native';
 import { Button } from '../components/common/Button';
@@ -9,13 +9,17 @@ import { Icon } from '../components/common/Icon';
 import { ThemedText } from '../components/common/ThemedText';
 import { RunMapView } from '../components/map/RunMapView';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { useRunSubmission } from '../hooks/useRunSubmission';
+import { rejectReasonMessage } from '../services/runs';
 import { useRunStore } from '../stores/useRunStore';
+import { formatArea } from '../utils/formatters';
 import { formatDuration, formatPace } from './run';
 
 export default function RunSummaryScreen() {
   const insets = useSafeAreaInsets();
   const session = useRunStore((state) => state.currentSession);
   const startRun = useRunStore((state) => state.startRun);
+  const { submission, retry } = useRunSubmission();
 
   useEffect(() => {
     if (!session || session.status !== 'finished') router.replace('/');
@@ -23,9 +27,34 @@ export default function RunSummaryScreen() {
 
   if (!session) return <View style={styles.screen} />;
 
-  const averagePace = session.distanceMeters > 0
-    ? session.durationSeconds / (session.distanceMeters / 1000)
+  // Once the server has scored the run, its numbers are the ones that count.
+  const result = submission.state === 'saved' ? submission.result : null;
+  const rejected = result?.status === 'rejected';
+  const distanceMeters = result?.distanceMeters ?? session.distanceMeters;
+  const durationSeconds = result?.durationSeconds ?? session.durationSeconds;
+  const cellCount = result ? result.cells.length : session.territoriesClaimedCount;
+  const areaKm2 = result ? result.areaKm2 : session.territoryCapturedKm2;
+  const xp = result ? result.xpEarned : session.xpEarned;
+  const saving = submission.state === 'saving' || submission.state === 'idle';
+  const averagePace = distanceMeters > 0
+    ? durationSeconds / (distanceMeters / 1000)
     : session.currentPaceSecondsPerKm;
+
+  const heading = rejected
+    ? { eyebrow: 'RUN NOT COUNTED', title: 'This one didn’t count.', subtitle: rejectReasonMessage(result.rejectReason) }
+    : submission.state === 'failed'
+      ? { eyebrow: 'NOT SAVED YET', title: 'Your run isn’t saved.', subtitle: submission.error }
+      : saving
+        ? { eyebrow: 'SAVING RUN', title: 'Claiming your territory…', subtitle: 'Checking your route with the server.' }
+        : { eyebrow: 'RUN COMPLETE', title: 'Nice work out there.', subtitle: result?.runId ? 'Your territory is on the map.' : 'Offline demo: this run wasn’t saved.' };
+
+  const breakdown = result && !rejected && result.runId
+    ? [
+        result.cellsNew ? `${result.cellsNew} new` : null,
+        result.cellsStolen ? `${result.cellsStolen} stolen` : null,
+        result.cellsDefended ? `${result.cellsDefended} defended` : null,
+      ].filter(Boolean).join(' · ')
+    : '';
 
   return (
     <View style={styles.screen}>
@@ -34,18 +63,22 @@ export default function RunSummaryScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }]}
       >
         <View style={styles.headingRow}>
-          <View style={styles.successMark}>
-            <Icon icon={Award} size={22} color={Colors.primary} strokeWidth={2.3} />
+          <View style={[styles.successMark, (rejected || submission.state === 'failed') && styles.warningMark]}>
+            {saving ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : (
+              <Icon icon={Award} size={22} color={rejected || submission.state === 'failed' ? Colors.danger : Colors.primary} strokeWidth={2.3} />
+            )}
           </View>
           <View style={styles.headingCopy}>
-            <ThemedText style={styles.eyebrow}>RUN COMPLETE</ThemedText>
-            <ThemedText style={styles.title}>Nice work out there.</ThemedText>
-            <ThemedText style={styles.subtitle}>Every run moves your territory forward.</ThemedText>
+            <ThemedText style={[styles.eyebrow, (rejected || submission.state === 'failed') && styles.warningText]}>{heading.eyebrow}</ThemedText>
+            <ThemedText style={styles.title}>{heading.title}</ThemedText>
+            <ThemedText style={styles.subtitle}>{heading.subtitle}</ThemedText>
           </View>
         </View>
 
         <View style={styles.mapCard}>
-          <RunMapView route={session.route} capturedCells={session.capturedCells} />
+          <RunMapView route={session.route} capturedCells={result ? result.cells : session.capturedCells} />
           <View style={styles.routeTag}>
             <View style={styles.routeDot} />
             <ThemedText style={styles.routeTagText}>YOUR ROUTE</ThemedText>
@@ -60,14 +93,14 @@ export default function RunSummaryScreen() {
           <SummaryStat
             icon={Footprints}
             label="DISTANCE"
-            value={`${(session.distanceMeters / 1000).toFixed(2)}`}
+            value={`${(distanceMeters / 1000).toFixed(2)}`}
             unit="KM"
             accent
           />
           <SummaryStat
             icon={Timer}
             label="DURATION"
-            value={formatDuration(session.durationSeconds)}
+            value={formatDuration(durationSeconds)}
           />
           <SummaryStat
             icon={MapPin}
@@ -78,7 +111,7 @@ export default function RunSummaryScreen() {
           <SummaryStat
             icon={Award}
             label="XP EARNED"
-            value={`${session.xpEarned}`}
+            value={saving ? '…' : `${xp}`}
             unit="XP"
             accent
           />
@@ -91,11 +124,16 @@ export default function RunSummaryScreen() {
           <View style={styles.territoryCopy}>
             <ThemedText style={styles.territoryEyebrow}>TERRITORY CAPTURED</ThemedText>
             <ThemedText style={styles.territoryName}>
-              {session.territoriesClaimedCount} hex {session.territoriesClaimedCount === 1 ? 'cell' : 'cells'}
+              {cellCount} hex {cellCount === 1 ? 'cell' : 'cells'}
             </ThemedText>
+            {breakdown ? <ThemedText style={styles.territoryBreakdown}>{breakdown}</ThemedText> : null}
           </View>
-          <ThemedText style={styles.territoryArea}>+{session.territoryCapturedKm2.toFixed(3)} km²</ThemedText>
+          <ThemedText style={styles.territoryArea}>+{formatArea(areaKm2)}</ThemedText>
         </Card>
+
+        {submission.state === 'failed' ? (
+          <Button title="TRY SAVING AGAIN" variant="secondary" size="lg" fullWidth onPress={retry} />
+        ) : null}
 
         <Button
           title="BACK TO MAP"
@@ -110,6 +148,7 @@ export default function RunSummaryScreen() {
           size="md"
           fullWidth
           leftIcon={<Icon icon={Footprints} size={16} color={Colors.textSecondary} />}
+          disabled={saving}
           onPress={() => {
             startRun();
             router.replace('/run');
@@ -170,6 +209,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(183, 243, 74, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  warningMark: {
+    backgroundColor: Colors.dangerMuted,
+    borderColor: Colors.danger,
+  },
+  warningText: {
+    color: Colors.danger,
+  },
+  territoryBreakdown: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
   },
   headingCopy: {
     flex: 1,

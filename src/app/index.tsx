@@ -14,28 +14,38 @@ import { ThemedText } from '../components/common/ThemedText';
 import { MOCK_NEARBY_PLAYERS } from '../data/mockPlayers';
 import { MOCK_TERRITORIES } from '../data/mockTerritories';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { DEMO_BOUNDS } from '../constants/map';
+import { useMyStats, useTerritoriesInBounds } from '../hooks/useServerData';
+import type { Bounds } from '../services/territory';
 import { useRunStore } from '../stores/useRunStore';
 import { Territory } from '../types/territory';
+import { formatArea } from '../utils/formatters';
 
 export default function Index() {
   const insets = useSafeAreaInsets();
   const [selectedTerritory, setSelectedTerritory] = useState<Territory | null>(null);
   const runStatus = useRunStore((state) => state.status);
   const startRun = useRunStore((state) => state.startRun);
+  const [bounds, setBounds] = useState<Bounds>(DEMO_BOUNDS);
+  // Live cells from the server when signed in; mock territory in offline demo mode.
+  const { territories: liveTerritories } = useTerritoriesInBounds(bounds);
+  const territories = liveTerritories ?? MOCK_TERRITORIES;
+  const { data: myStats } = useMyStats();
 
   const territoryStats = useMemo(() => {
+    if (myStats) return { area: myStats.areaOwnedKm2, count: myStats.cellsOwned };
     const owned = MOCK_TERRITORIES.filter((territory) => territory.isCurrentPlayer);
     return {
       area: owned.reduce((total, territory) => total + territory.areaKm2, 0),
       count: owned.length,
     };
-  }, []);
+  }, [myStats]);
 
   const isRunning = runStatus === 'running' || runStatus === 'paused';
 
   return (
     <View style={styles.screen}>
-      <MapHomeView onSelectTerritory={setSelectedTerritory} />
+      <MapHomeView onSelectTerritory={setSelectedTerritory} territories={territories} onBoundsChange={setBounds} />
 
       <View style={[styles.topOverlay, { top: insets.top + Spacing.sm }]} pointerEvents="box-none">
         <View style={styles.headerRow}>
@@ -78,7 +88,7 @@ export default function Index() {
             <View style={styles.statDivider} />
             <View style={styles.statSecondary}>
               <ThemedText style={styles.statSecondaryValue}>{territoryStats.count}</ThemedText>
-              <ThemedText style={styles.statSecondaryLabel}>TERRITORIES</ThemedText>
+              <ThemedText style={styles.statSecondaryLabel}>{myStats ? 'CELLS' : 'TERRITORIES'}</ThemedText>
             </View>
           </Card>
 
@@ -173,11 +183,14 @@ export default function Index() {
             <View style={styles.territoryDetails}>
               <View style={[styles.ownerSwatch, { backgroundColor: selectedTerritory.ownerColor }]} />
               <View style={styles.territoryDetailText}>
-                <ThemedText style={styles.territoryArea}>{selectedTerritory.areaKm2.toFixed(3)} km²</ThemedText>
+                <ThemedText style={styles.territoryArea}>{formatArea(selectedTerritory.areaKm2)}</ThemedText>
                 <ThemedText variant="caption">Captured {formatDate(selectedTerritory.capturedAt)}</ThemedText>
+                {selectedTerritory.previousOwnerName ? (
+                  <ThemedText variant="caption">Taken from {selectedTerritory.previousOwnerName}</ThemedText>
+                ) : null}
               </View>
             </View>
-            {!selectedTerritory.isCurrentPlayer && selectedTerritory.ownerId ? (
+            {!liveTerritories && !selectedTerritory.isCurrentPlayer && selectedTerritory.ownerId ? (
               <Button
                 title="VIEW RUNNER PROFILE"
                 variant="secondary"

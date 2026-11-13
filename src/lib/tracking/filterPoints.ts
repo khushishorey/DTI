@@ -9,6 +9,8 @@ export interface TrackPoint extends Coordinates {
   accuracy: number | null;
   /** true when the OS says the reading came from a mock-location provider */
   mocked?: boolean;
+  /** Set by the run store on the first accepted point after start/resume. */
+  segmentStart?: boolean;
 }
 
 export type RejectReason = 'low-accuracy' | 'mocked' | 'too-fast' | 'stale';

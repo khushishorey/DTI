@@ -1,9 +1,13 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
+import React, { useEffect, useMemo, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Svg, { Polygon } from 'react-native-svg';
+import { Colors, Radius } from '../../constants/theme';
+import { DEMO_BOUNDS, DEMO_REGION } from '../../constants/map';
 import { MOCK_NEARBY_PLAYERS } from '../../data/mockPlayers';
 import { MOCK_TERRITORIES } from '../../data/mockTerritories';
-import { Territory } from '../../types/territory';
+import { RUN_START } from '../../data/mockRunRoute';
+import type { Bounds } from '../../services/territory';
+import { Coordinates, Territory } from '../../types/territory';
 import { MapCanvas } from './MapCanvas.web';
 
 interface MapHomeViewProps {
@@ -11,57 +15,94 @@ interface MapHomeViewProps {
   territories?: Territory[];
   players?: typeof MOCK_NEARBY_PLAYERS;
   centerOnLocationKey?: number;
+  onBoundsChange?: (bounds: Bounds) => void;
 }
 
+/**
+ * Web preview of the territory map. There is no map tile layer on web, so territories and
+ * players are projected onto a stylised canvas covering the demo area at their real
+ * coordinates (same data as the native map, just no streets).
+ */
 export function MapHomeView({
   onSelectTerritory,
   territories = MOCK_TERRITORIES,
   players = MOCK_NEARBY_PLAYERS,
   centerOnLocationKey = 0,
+  onBoundsChange,
 }: MapHomeViewProps) {
+  // The map fills the screen; use the window size until the first layout measurement.
+  const window = useWindowDimensions();
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+  const size = measured ?? { width: window.width, height: window.height };
+  const project = useMemo(() => createProjection(size.width, size.height), [size.width, size.height]);
+
+  useEffect(() => {
+    onBoundsChange?.(DEMO_BOUNDS);
+  }, [onBoundsChange]);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width > 0 && height > 0) setMeasured({ width, height });
+  };
+
+  const me = project(RUN_START);
+
   return (
-    <MapCanvas key={centerOnLocationKey} accessibilityLabel="Simulated territory map preview">
-      {territories.map((territory, index) => {
-        const position = TERRITORY_POSITIONS[index % TERRITORY_POSITIONS.length];
-        return (
-          <Pressable
-            key={territory.id}
-            accessibilityRole="button"
-            accessibilityLabel={`${territory.name}, owned by ${territory.ownerName}`}
-            onPress={() => onSelectTerritory(territory)}
-            style={[
-              styles.territory,
-              {
-                left: `${position.left}%`,
-                top: `${position.top}%`,
-                width: position.width,
-                height: position.height,
-                borderColor: withAlpha(territory.ownerColor, 0.82),
-                backgroundColor: withAlpha(territory.ownerColor, 0.17),
-                transform: [{ rotate: position.rotate }],
-              },
-            ]}
-          >
-            <View style={[styles.territoryDot, { backgroundColor: territory.ownerColor }]} />
-          </Pressable>
-        );
-      })}
+    <MapCanvas key={centerOnLocationKey} onLayout={onLayout} accessibilityLabel="Territory map preview">
+      {size.width > 0 ? (
+        <Svg width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+          {territories.map((territory) => (
+            <Polygon
+              key={territory.id}
+              points={territory.coordinates.map((c) => {
+                const { x, y } = project(c);
+                return `${x},${y}`;
+              }).join(' ')}
+              fill={withAlpha(territory.ownerColor, territory.isCurrentPlayer ? 0.24 : 0.17)}
+              stroke={withAlpha(territory.ownerColor, 0.85)}
+              strokeWidth={territory.isCurrentPlayer ? 2 : 1.4}
+              onPress={() => onSelectTerritory(territory)}
+              accessibilityLabel={`${territory.name}, owned by ${territory.ownerName}`}
+            />
+          ))}
+        </Svg>
+      ) : null}
 
-      <View style={styles.currentHalo}>
-        <View style={styles.currentDot} />
-      </View>
+      {size.width > 0 ? (
+        <View pointerEvents="none" style={[styles.currentHalo, { left: me.x - 22, top: me.y - 22 }]}>
+          <View style={styles.currentDot} />
+        </View>
+      ) : null}
 
-      {players.map((player, index) => {
-        const position = PLAYER_POSITIONS[index % PLAYER_POSITIONS.length];
-        return (
-          <View key={player.id} style={[styles.playerMarker, { left: `${position.left}%`, top: `${position.top}%` }]}>
-            <View style={[styles.playerDot, { backgroundColor: player.territoryColor }]} />
-            <View style={styles.playerName}><View style={[styles.playerNameDot, { backgroundColor: player.territoryColor }]} /><View style={styles.playerNameRule} /></View>
-          </View>
-        );
-      })}
+      {size.width > 0
+        ? players.map((player) => {
+            const { x, y } = project(player.location);
+            return (
+              <View key={player.id} pointerEvents="none" style={[styles.playerMarker, { left: x - 7, top: y - 7 }]}>
+                <View style={[styles.playerDot, { backgroundColor: player.territoryColor }]} />
+                <View style={styles.playerName}>
+                  <View style={[styles.playerNameDot, { backgroundColor: player.territoryColor }]} />
+                  <View style={styles.playerNameRule} />
+                </View>
+              </View>
+            );
+          })
+        : null}
     </MapCanvas>
   );
+}
+
+/** Equirectangular projection that covers the canvas with the demo region (equal x/y scale). */
+function createProjection(width: number, height: number) {
+  const lngScale = Math.cos((DEMO_REGION.latitude * Math.PI) / 180);
+  const scale = Math.max(
+    width / (DEMO_REGION.longitudeDelta * lngScale),
+    height / DEMO_REGION.latitudeDelta,
+  );
+  return (point: Coordinates) => ({
+    x: width / 2 + (point.longitude - DEMO_REGION.longitude) * lngScale * scale,
+    y: height / 2 - (point.latitude - DEMO_REGION.latitude) * scale,
+  });
 }
 
 function withAlpha(hex: string, alpha: number) {
@@ -69,40 +110,9 @@ function withAlpha(hex: string, alpha: number) {
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
 }
 
-const TERRITORY_POSITIONS = [
-  { left: 43, top: 36, width: 146, height: 104, rotate: '-18deg' },
-  { left: 21, top: 53, width: 138, height: 91, rotate: '17deg' },
-  { left: 57, top: 19, width: 148, height: 88, rotate: '11deg' },
-  { left: 57, top: 64, width: 138, height: 96, rotate: '-12deg' },
-  { left: 12, top: 22, width: 130, height: 88, rotate: '9deg' },
-  { left: 34, top: 69, width: 128, height: 82, rotate: '-7deg' },
-];
-const PLAYER_POSITIONS = [
-  { left: 29, top: 31 },
-  { left: 77, top: 46 },
-  { left: 39, top: 74 },
-];
-
 const styles = StyleSheet.create({
-  territory: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderRadius: 23,
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    padding: Spacing.sm,
-  },
-  territoryDot: {
-    width: 7,
-    height: 7,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.textPrimary,
-  },
   currentHalo: {
     position: 'absolute',
-    left: '47%',
-    top: '45%',
     width: 44,
     height: 44,
     borderRadius: Radius.full,

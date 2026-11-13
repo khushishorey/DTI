@@ -14,7 +14,11 @@ import { MapHomeView } from '../components/map/MapHomeView';
 import { MOCK_NEARBY_PLAYERS } from '../data/mockPlayers';
 import { MOCK_EXPLORE_TERRITORIES } from '../data/mockTerritories';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { DEMO_BOUNDS } from '../constants/map';
+import { useTerritoriesInBounds } from '../hooks/useServerData';
+import type { Bounds } from '../services/territory';
 import { Territory } from '../types/territory';
+import { formatArea } from '../utils/formatters';
 
 const FILTERS = ['All', 'Yours', 'Rivals', 'Unclaimed', 'Contested'] as const;
 type TerritoryFilter = typeof FILTERS[number];
@@ -27,8 +31,12 @@ export default function ExploreScreen() {
   const [centerOnLocationKey, setCenterOnLocationKey] = useState(0);
   const [centerMessage, setCenterMessage] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
+  const [bounds, setBounds] = useState<Bounds>(DEMO_BOUNDS);
+  const { territories: liveTerritories } = useTerritoriesInBounds(bounds);
+  const isLive = liveTerritories !== null;
+  const allTerritories = liveTerritories ?? MOCK_EXPLORE_TERRITORIES;
 
-  const visibleTerritories = useMemo(() => MOCK_EXPLORE_TERRITORIES.filter((territory) => {
+  const visibleTerritories = useMemo(() => allTerritories.filter((territory) => {
     const status = territory.status ?? 'owned';
     const matchesFilter = filter === 'All'
       || (filter === 'Yours' && territory.isCurrentPlayer)
@@ -39,7 +47,7 @@ export default function ExploreScreen() {
       || territory.name.toLowerCase().includes(normalizedQuery)
       || territory.ownerName.toLowerCase().includes(normalizedQuery);
     return matchesFilter && matchesSearch;
-  }), [filter, normalizedQuery]);
+  }), [allTerritories, filter, normalizedQuery]);
 
   const visiblePlayers = useMemo(() => {
     if (!normalizedQuery) return MOCK_NEARBY_PLAYERS;
@@ -74,6 +82,7 @@ export default function ExploreScreen() {
         territories={visibleTerritories}
         players={visiblePlayers}
         centerOnLocationKey={centerOnLocationKey}
+        onBoundsChange={setBounds}
       />
 
       <View style={[styles.topPanel, { paddingTop: insets.top + Spacing.sm }]}>
@@ -149,7 +158,7 @@ export default function ExploreScreen() {
         visible={Boolean(selectedTerritory)}
         onClose={() => setSelectedTerritory(null)}
         title={selectedTerritory?.name}
-        subtitle={selectedTerritory ? `${selectedTerritory.areaKm2.toFixed(3)} km² captured` : undefined}
+        subtitle={selectedTerritory ? `${formatArea(selectedTerritory.areaKm2)} captured` : undefined}
         scrollable
       >
         {selectedTerritory ? (
@@ -167,6 +176,9 @@ export default function ExploreScreen() {
                   {selectedTerritory.status === 'unclaimed' ? 'No owner' : selectedTerritory.ownerName.replace('You (', '').replace(')', '')}
                 </ThemedText>
                 {selectedOwner ? <ThemedText style={styles.ownerLevel}>Level {selectedOwner.level} · {selectedOwner.isOnline ? 'Online' : 'Offline'}</ThemedText> : null}
+                {selectedTerritory.previousOwnerName ? (
+                  <ThemedText style={styles.ownerLevel}>Taken from {selectedTerritory.previousOwnerName}</ThemedText>
+                ) : null}
               </View>
               <View style={[styles.statusPill, getStatusStyle(selectedStatus)]}>
                 <ThemedText style={[styles.statusText, getStatusTextStyle(selectedStatus)]}>{selectedStatus}</ThemedText>
@@ -175,8 +187,8 @@ export default function ExploreScreen() {
 
             <View style={styles.detailRow}>
               <View style={styles.detailCard}>
-                <ThemedText style={styles.detailValue}>{selectedTerritory.areaKm2.toFixed(3)}</ThemedText>
-                <ThemedText style={styles.detailLabel}>KM² AREA</ThemedText>
+                <ThemedText style={styles.detailValue}>{formatArea(selectedTerritory.areaKm2)}</ThemedText>
+                <ThemedText style={styles.detailLabel}>AREA</ThemedText>
               </View>
               <View style={styles.detailCard}>
                 <ThemedText style={styles.detailValue}>{selectedTerritory.status === 'unclaimed' ? 'Open ground' : formatCaptureDate(selectedTerritory.capturedAt)}</ThemedText>
@@ -184,6 +196,7 @@ export default function ExploreScreen() {
               </View>
             </View>
 
+            {isLive ? null : (
             <Button
               title={selectedStatus === 'Unclaimed' ? 'UNCLAIMED TERRITORY' : 'VIEW PROFILE'}
               variant={selectedStatus === 'Unclaimed' ? 'secondary' : 'primary'}
@@ -193,6 +206,7 @@ export default function ExploreScreen() {
               leftIcon={<Icon icon={selectedStatus === 'Unclaimed' ? MapPin : Users} size={16} color={selectedStatus === 'Unclaimed' ? Colors.textSecondary : Colors.textInverse} />}
               style={styles.profileButton}
             />
+            )}
           </View>
         ) : null}
       </BottomSheet>

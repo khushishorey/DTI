@@ -17,6 +17,8 @@ export interface Territory {
   capturedAt: string;
   coordinates: Coordinates[];
   status?: TerritoryStatus;
+  /** Who held it before the current owner, when it was taken from someone. */
+  previousOwnerName?: string;
 }
 
 export interface HexCell {

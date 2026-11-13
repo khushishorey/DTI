@@ -14,6 +14,8 @@ import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { Button } from '../components/common/Button';
 import { signOut } from '../services/auth';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useMyRuns, useMyStats } from '../hooks/useServerData';
+import { runToActivity } from '../utils/runActivity';
 
 const ACHIEVEMENT_ICONS = {
   footprints: Footprints,
@@ -27,11 +29,29 @@ const ACHIEVEMENT_ICONS = {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const account = useAuthStore((state) => state.profile);
-  // Name, colour and level are real once signed in; career stats stay mock until week 2.
+  const { data: stats } = useMyStats();
+  const { data: runs, isLoading: runsLoading } = useMyRuns();
+  // Signed in: real profile, stats and runs. Offline demo mode: mock data.
+  // (Wins, streak and achievements arrive with parties in week 3.)
   const profile = account
-    ? { ...MOCK_PROFILE, username: account.username, level: account.level }
+    ? {
+        ...MOCK_PROFILE,
+        username: account.username,
+        level: account.level,
+        totalDistanceKm: stats?.totalDistanceKm ?? 0,
+        totalTerritoryCapturedKm2: stats?.areaOwnedKm2 ?? 0,
+        totalRunsCount: stats?.runCount ?? 0,
+        winsCount: 0,
+      }
     : MOCK_PROFILE;
   const accentColor = account?.color ?? Colors.primary;
+  const xp = account?.xp ?? 2480;
+  const xpIntoLevel = account ? xp % 1000 : 2480;
+  const xpForLevel = account ? 1000 : 3000;
+  const activities = account ? (runs ?? []).map((run) => runToActivity(run)) : MOCK_RECENT_ACTIVITIES;
+  const memberSince = account
+    ? new Date(account.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()
+    : 'FEB 2025';
   const unlockedCount = MOCK_ACHIEVEMENTS.filter((achievement) => achievement.unlocked).length;
 
   return (
@@ -45,10 +65,12 @@ export default function ProfileScreen() {
             <ThemedText style={styles.pageTitle}>Profile</ThemedText>
             <ThemedText style={styles.pageSubtitle}>Your running record.</ThemedText>
           </View>
-          <View style={styles.streakPill}>
-            <Icon icon={Flame} size={14} color={Colors.competitorOrange} />
-            <ThemedText style={styles.streakText}>7 DAY STREAK</ThemedText>
-          </View>
+          {account ? null : (
+            <View style={styles.streakPill}>
+              <Icon icon={Flame} size={14} color={Colors.competitorOrange} />
+              <ThemedText style={styles.streakText}>7 DAY STREAK</ThemedText>
+            </View>
+          )}
         </View>
 
         <View style={styles.profileCard}>
@@ -59,11 +81,13 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.profileCopy}>
               <ThemedText style={styles.username}>{profile.username}</ThemedText>
-              <View style={styles.locationLine}>
-                <Icon icon={MapPin} size={12} color={Colors.textSecondary} />
-                <ThemedText style={styles.locationText}>San Francisco, CA</ThemedText>
-              </View>
-              <ThemedText style={styles.memberSince}>RUNNER SINCE FEB 2025</ThemedText>
+              {account ? null : (
+                <View style={styles.locationLine}>
+                  <Icon icon={MapPin} size={12} color={Colors.textSecondary} />
+                  <ThemedText style={styles.locationText}>San Francisco, CA</ThemedText>
+                </View>
+              )}
+              <ThemedText style={styles.memberSince}>RUNNER SINCE {memberSince}</ThemedText>
             </View>
             <View style={styles.levelPill}>
               <Icon icon={Shield} size={12} color={Colors.primary} />
@@ -73,9 +97,13 @@ export default function ProfileScreen() {
 
           <View style={styles.levelProgressHeader}>
             <ThemedText style={styles.levelProgressLabel}>LEVEL PROGRESS</ThemedText>
-            <ThemedText style={styles.levelProgressValue}>2,480 / 3,000 XP</ThemedText>
+            <ThemedText style={styles.levelProgressValue}>
+              {xpIntoLevel.toLocaleString()} / {xpForLevel.toLocaleString()} XP
+            </ThemedText>
           </View>
-          <View style={styles.progressTrack}><View style={styles.progressFill} /></View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.round((xpIntoLevel / xpForLevel) * 100)}%` }]} />
+          </View>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -119,8 +147,14 @@ export default function ProfileScreen() {
           </View>
           <Icon icon={Medal} size={17} color={Colors.textSecondary} />
         </View>
-        <View style={styles.activityList}>
-          {MOCK_RECENT_ACTIVITIES.map((activity) => (
+        {account && !runsLoading && activities.length === 0 ? (
+          <View style={styles.emptyActivity}>
+            <ThemedText style={styles.emptyActivityTitle}>No runs yet</ThemedText>
+            <ThemedText style={styles.emptyActivityText}>Start a run from the map to claim your first cells.</ThemedText>
+          </View>
+        ) : null}
+        <View style={[styles.activityList, activities.length === 0 && styles.hidden]}>
+          {activities.map((activity) => (
             <ActivityHistoryRow
               key={activity.id}
               title={activity.title}
@@ -174,7 +208,11 @@ const styles = StyleSheet.create({
   levelProgressLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: Typography.weights.bold, letterSpacing: 0.7 },
   levelProgressValue: { color: Colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] },
   progressTrack: { height: 5, backgroundColor: Colors.surfaceHighlight, borderRadius: Radius.full, overflow: 'hidden' },
-  progressFill: { width: '83%', height: '100%', borderRadius: Radius.full, backgroundColor: Colors.primary },
+  progressFill: { height: '100%', borderRadius: Radius.full, backgroundColor: Colors.primary },
+  emptyActivity: { padding: Spacing.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg },
+  emptyActivityTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.sm, fontWeight: Typography.weights.semibold },
+  emptyActivityText: { color: Colors.textSecondary, fontSize: 12, marginTop: 4 },
+  hidden: { display: 'none' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xl, marginBottom: Spacing.md },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.sizes.base, fontWeight: Typography.weights.semibold },
   sectionSubtitle: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },
