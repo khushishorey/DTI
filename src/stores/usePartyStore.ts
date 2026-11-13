@@ -6,6 +6,9 @@ import { CreatePartyInput, Party } from '../types/party';
 interface PartyState {
   parties: Party[];
   activeParty: Party | null;
+  /** Server party the user is currently viewing/playing (live mode). */
+  activePartyId: string | null;
+  setActivePartyId: (id: string | null) => void;
   setActiveParty: (party: Party | null) => void;
   setParties: (parties: Party[]) => void;
   createParty: (input: CreatePartyInput) => Party;
@@ -23,6 +26,8 @@ function updateParty(parties: Party[], updated: Party) {
 export const usePartyStore = create<PartyState>((set, get) => ({
   parties: MOCK_PARTIES,
   activeParty: null,
+  activePartyId: null,
+  setActivePartyId: (id) => set({ activePartyId: id }),
 
   setActiveParty: (party) => set({ activeParty: party }),
   setParties: (parties) => set({ parties }),

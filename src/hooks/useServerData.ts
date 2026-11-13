@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { fetchGlobalLeaderboard, fetchNearbyLeaderboard, fetchPartyLeaderboard } from '../services/leaderboard';
+import { fetchPlayer } from '../services/players';
 import { fetchMyRuns } from '../services/runs';
 import { fetchMyStats } from '../services/stats';
 import { Bounds, cellsToTerritories, fetchCellOwner, fetchCellsInBounds, snapBounds } from '../services/territory';
@@ -13,6 +15,12 @@ export const queryKeys = {
   allCellOwners: ['cell-owner'] as const,
   myStats: ['my-stats'] as const,
   myRuns: ['my-runs'] as const,
+  parties: ['parties'] as const,
+  party: (id: string) => ['party', id] as const,
+  partyLeaderboard: (id: string) => ['party-leaderboard', id] as const,
+  globalLeaderboard: ['leaderboard', 'global'] as const,
+  nearbyLeaderboard: (bounds: Bounds) => ['leaderboard', 'nearby', bounds] as const,
+  player: (id: string) => ['player', id] as const,
 };
 
 /**
@@ -60,4 +68,48 @@ export function useMyStats() {
 export function useMyRuns() {
   const online = useIsOnline();
   return useQuery({ queryKey: queryKeys.myRuns, queryFn: () => fetchMyRuns(10), enabled: online });
+}
+
+export function useGlobalLeaderboard() {
+  const online = useIsOnline();
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  return useQuery({
+    queryKey: queryKeys.globalLeaderboard,
+    queryFn: () => fetchGlobalLeaderboard(myUserId),
+    enabled: online,
+    staleTime: 30_000,
+  });
+}
+
+export function useNearbyLeaderboard(bounds: Bounds) {
+  const online = useIsOnline();
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  const snapped = useMemo(() => snapBounds(bounds), [bounds]);
+  return useQuery({
+    queryKey: queryKeys.nearbyLeaderboard(snapped),
+    queryFn: () => fetchNearbyLeaderboard(snapped, myUserId),
+    enabled: online,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function usePartyLeaderboard(partyId: string | undefined) {
+  const online = useIsOnline();
+  const myUserId = useAuthStore((state) => state.session?.user.id);
+  return useQuery({
+    queryKey: queryKeys.partyLeaderboard(partyId ?? ''),
+    queryFn: () => fetchPartyLeaderboard(partyId!, myUserId),
+    enabled: online && Boolean(partyId),
+  });
+}
+
+export function usePlayer(id: string | undefined) {
+  const online = useIsOnline();
+  return useQuery({
+    queryKey: queryKeys.player(id ?? ''),
+    queryFn: () => fetchPlayer(id!),
+    enabled: online && Boolean(id),
+    staleTime: 60_000,
+  });
 }
