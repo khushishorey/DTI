@@ -112,4 +112,12 @@ describe('parseSubmission', () => {
       parseSubmission({ startedAt: 1, endedAt: 2, durationSeconds: 1, points: [{ latitude: 200, longitude: 0, timestamp: 1 }] }),
     ).toThrow('latitude');
   });
+
+  it('drops a malformed partyId instead of losing the run', () => {
+    const body = JSON.parse(JSON.stringify(submission(jog(3))));
+    expect(parseSubmission({ ...body, partyId: 'not-a-uuid' }).partyId).toBeNull();
+    expect(parseSubmission({ ...body, partyId: 42 }).partyId).toBeNull();
+    const id = '0b6e5c1a-3f2d-4e8b-9a7c-1d2e3f4a5b6c';
+    expect(parseSubmission({ ...body, partyId: id }).partyId).toBe(id);
+  });
 });

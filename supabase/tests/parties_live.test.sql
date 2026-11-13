@@ -1,7 +1,7 @@
 -- Party RPCs, party scoring in apply_run, nearby leaderboard, player summary.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(39);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (as postgres). The auth trigger creates a profile per user.
@@ -14,10 +14,13 @@ insert into auth.users (id, email) values
   ('44444444-4444-4444-4444-444444444444', 'u4@test.local'),
   ('55555555-5555-5555-5555-555555555555', 'u5@test.local');
 
-insert into public.parties (id, code, name, host_id, status, max_participants) values
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'AB12CD', 'Capacity two', '11111111-1111-1111-1111-111111111111', 'lobby', 2),
-  ('aaaaaaaa-0000-0000-0000-000000000002', 'DONE01', 'Finished', '33333333-3333-3333-3333-333333333333', 'completed', 8),
-  ('aaaaaaaa-0000-0000-0000-000000000003', 'LOBBY1', 'Still lobby', '33333333-3333-3333-3333-333333333333', 'lobby', 8);
+-- DONE01 / LOBBY1 get a real window around now(), so only the status filter keeps them from scoring.
+insert into public.parties (id, code, name, host_id, status, max_participants, started_at, ends_at) values
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'AB12CD', 'Capacity two', '11111111-1111-1111-1111-111111111111', 'lobby', 2, null, null),
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'DONE01', 'Finished', '33333333-3333-3333-3333-333333333333', 'completed', 8,
+   now() - interval '5 minutes', now() + interval '25 minutes'),
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'LOBBY1', 'Still lobby', '33333333-3333-3333-3333-333333333333', 'lobby', 8,
+   now() - interval '5 minutes', now() + interval '25 minutes');
 
 insert into public.party_members (party_id, user_id) values
   ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111'),
@@ -142,6 +145,11 @@ select results_eq(
             (2::bigint, '11111111-1111-1111-1111-111111111111'::uuid, 0, true) $$,
   'get_party_leaderboard ranks by score');
 
+select is((select owner_id from public.cells where h3 = 't_cell_far'), '44444444-4444-4444-4444-444444444444'::uuid,
+  'u4 owns the far cell (non-member run still captures)');
+select is((select cells_owned from public.get_leaderboard() where user_id = '44444444-4444-4444-4444-444444444444'), 1,
+  'u4 appears in get_leaderboard with its far cell');
+
 select ok(exists (select 1 from public.get_leaderboard_nearby(9, 9, 11, 11)
                   where user_id = '22222222-2222-2222-2222-222222222222'),
   'get_leaderboard_nearby includes owners inside box');
@@ -162,6 +170,17 @@ select throws_ok($$ select public.finish_party('aaaaaaaa-0000-0000-0000-00000000
   'P0001', 'Party has not ended yet', 'finish_party by member before ends_at rejected');
 
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+
+-- Hosts can't bypass start/finish rules by writing the row directly.
+select throws_ok($$ update public.parties set status = 'completed' where id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+  '42501', null, 'host cannot set status directly');
+select throws_ok($$ update public.parties set ends_at = now() where id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+  '42501', null, 'host cannot set ends_at directly');
+select lives_ok($$ update public.parties set name = 'Renamed crew' where id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+  'host can rename directly');
+select is((select name from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000001'), 'Renamed crew',
+  'host rename is stored');
+
 select is((public.finish_party('aaaaaaaa-0000-0000-0000-000000000001')).status, 'completed'::public.party_status,
   'finish_party by host completes anytime');
 select is((public.finish_party('aaaaaaaa-0000-0000-0000-000000000001')).status, 'completed'::public.party_status,
@@ -170,6 +189,17 @@ select is((public.finish_party('aaaaaaaa-0000-0000-0000-000000000001')).status, 
 select public.leave_party((select id from public.parties where name = 'Morning crew'));
 select ok(not exists (select 1 from public.parties where name = 'Morning crew'),
   'leave_party by host deletes a lobby party');
+
+-- AB12CD is now completed but its window (started_at..ends_at) still covers now().
+reset role;
+create temp table r_finished as
+select public.apply_run('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-0000-0000-0000-000000000001',
+  now() - interval '10 minutes', now(), 1000, 600, null, 'accepted', null, '[]') as res;
+select is((select party_id from public.runs where id = (select (res ->> 'run_id')::uuid from r_finished)), null,
+  'apply_run ignores a finished party inside its window');
+select is((select score from public.party_members
+           where party_id = 'aaaaaaaa-0000-0000-0000-000000000001' and user_id = '22222222-2222-2222-2222-222222222222'),
+  315, 'apply_run leaves score unchanged after finish');
 
 select * from finish();
 rollback;

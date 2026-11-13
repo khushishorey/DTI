@@ -104,14 +104,17 @@ export function parseSubmission(body: unknown): RunSubmission {
       segmentStart: q.segmentStart === true,
     };
   });
-  const partyId = b.partyId;
-  if (partyId !== undefined && partyId !== null && typeof partyId !== 'string') throw new Error('"partyId" must be a string.');
+  // A bad partyId must not cost the runner their run (apply_run would fail on a non-uuid): drop it.
+  const partyId =
+    typeof b.partyId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.partyId)
+      ? b.partyId
+      : null;
   return {
     startedAt: num('startedAt'),
     endedAt: num('endedAt'),
     durationSeconds: num('durationSeconds'),
     points,
-    partyId: (partyId as string | null | undefined) ?? null,
+    partyId,
   };
 }
 

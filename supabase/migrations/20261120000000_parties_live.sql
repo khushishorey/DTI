@@ -12,6 +12,11 @@ create index party_members_user_idx on public.party_members (user_id);
 drop policy "users create parties they host" on public.parties;
 drop policy "users join parties as themselves" on public.party_members;
 
+-- Hosts may only rename / change visibility directly; status and timing go through the RPCs.
+-- (Same re-grant pattern as profiles: a column revoke wouldn't override the table grant.)
+revoke update on public.parties from authenticated, anon;
+grant update (name, visibility) on public.parties to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- create_party: host creates a lobby with a fresh 6-char code and joins it
 -- ---------------------------------------------------------------------------
@@ -28,12 +33,17 @@ security definer set search_path = ''
 as $$
 declare
   v_party public.parties;
+  v_tries integer := 0;
 begin
   if auth.uid() is null then
     raise exception 'Not signed in';
   end if;
 
   loop
+    v_tries := v_tries + 1;
+    if v_tries > 10 then
+      raise exception 'Could not generate party code';
+    end if;
     begin
       insert into public.parties (code, name, host_id, game_mode, visibility, duration_minutes, max_participants)
       values (
