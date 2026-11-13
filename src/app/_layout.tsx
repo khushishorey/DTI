@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { Colors } from '../constants/theme';
 import { useAuthStore } from '../stores/useAuthStore';
+import { usePartyStore } from '../stores/usePartyStore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
@@ -52,6 +53,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (status === 'signed-out' && previousStatus.current !== 'signed-out') {
       queryClient.clear(); // never show the previous player's data to the next one
+      usePartyStore.getState().setActivePartyId(null);
       const launch = launchPath.current;
       const openedOnAuthPage = previousStatus.current === 'loading' && isAuthPath(launch);
       router.replace(openedOnAuthPage ? launch : '/get-started');

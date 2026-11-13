@@ -15,7 +15,8 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
 import { PartyGameMode, PartyVisibility } from '../../types/party';
 
-const PRESET_DURATIONS = [10, 20, 30, 60, 120, 1440];
+// Must stay within the parties table check (duration_minutes between 5 and 240).
+const PRESET_DURATIONS = [10, 20, 30, 60, 120, 240];
 const GAME_MODES: { value: PartyGameMode; label: string; description: string; icon: typeof Map }[] = [
   { value: 'territory_control', label: 'Territory Control', description: 'Capture the most ground.', icon: Map },
   { value: 'distance_race', label: 'Distance Race', description: 'Cover the most distance.', icon: Timer },
@@ -36,7 +37,7 @@ export default function CreatePartyScreen() {
   const customValue = Number.parseInt(customDuration, 10);
   const hasCustomDuration = customDuration.trim().length > 0;
   const selectedDuration = hasCustomDuration ? customValue : duration;
-  const customIsValid = !hasCustomDuration || (Number.isInteger(customValue) && customValue >= 5 && customValue <= 10080);
+  const customIsValid = !hasCustomDuration || (Number.isInteger(customValue) && customValue >= 5 && customValue <= 240);
   const canCreate = name.trim().length >= 3 && customIsValid && selectedDuration > 0;
 
   const handleCreate = async () => {
@@ -132,11 +133,11 @@ export default function CreatePartyScreen() {
       <Input
         label="Custom duration (minutes)"
         value={customDuration}
-        onChangeText={(value) => setCustomDuration(value.replace(/\D/g, '').slice(0, 5))}
+        onChangeText={(value) => setCustomDuration(value.replace(/\D/g, '').slice(0, 3))}
         placeholder="For example, 45"
         keyboardType="number-pad"
-        error={hasCustomDuration && !customIsValid ? 'Enter a duration from 5 minutes to 7 days.' : undefined}
-        hint={!hasCustomDuration ? 'Optional · 5 to 10,080 minutes' : undefined}
+        error={hasCustomDuration && !customIsValid ? 'Enter a duration from 5 to 240 minutes (4 hours).' : undefined}
+        hint={!hasCustomDuration ? 'Optional · 5 to 240 minutes' : undefined}
       />
 
       <SectionTitle title="Maximum players" subtitle="Including you as the party leader." />
@@ -163,7 +164,6 @@ export default function CreatePartyScreen() {
 }
 
 function durationLabel(minutes: number) {
-  if (minutes === 1440) return '24 hours';
   if (minutes >= 60) return `${minutes / 60} hr`;
   return `${minutes} min`;
 }

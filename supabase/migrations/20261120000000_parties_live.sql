@@ -12,6 +12,17 @@ create index party_members_user_idx on public.party_members (user_id);
 drop policy "users create parties they host" on public.parties;
 drop policy "users join parties as themselves" on public.party_members;
 
+-- Private parties (and their join codes) are visible only to their host and members; others
+-- join by code through join_party (security definer). party_members' select policy is
+-- using (true), so this exists() can't recurse back into parties' policies.
+drop policy "parties are visible to signed-in users" on public.parties;
+create policy "parties are visible to signed-in users" on public.parties
+  for select to authenticated using (
+    visibility = 'public'
+    or host_id = auth.uid()
+    or exists (select 1 from public.party_members m where m.party_id = parties.id and m.user_id = auth.uid())
+  );
+
 -- Hosts may only rename / change visibility directly; status and timing go through the RPCs.
 -- (Same re-grant pattern as profiles: a column revoke wouldn't override the table grant.)
 revoke update on public.parties from authenticated, anon;

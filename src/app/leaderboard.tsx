@@ -105,7 +105,7 @@ export default function LeaderboardScreen() {
         )}
         <View style={styles.scoreHint}>
           <Icon icon={Trophy} size={13} color={Colors.textMuted} />
-          <ThemedText style={styles.scoreHintText}>Score combines territory captured, distance, and competition wins.</ThemedText>
+          <ThemedText style={styles.scoreHintText}>Score combines territory held and distance run.</ThemedText>
         </View>
       </ScrollView>
 

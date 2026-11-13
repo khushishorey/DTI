@@ -1,7 +1,7 @@
 -- Party RPCs, party scoring in apply_run, nearby leaderboard, player summary.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(39);
+select plan(46);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (as postgres). The auth trigger creates a profile per user.
@@ -200,6 +200,37 @@ select is((select party_id from public.runs where id = (select (res ->> 'run_id'
 select is((select score from public.party_members
            where party_id = 'aaaaaaaa-0000-0000-0000-000000000001' and user_id = '22222222-2222-2222-2222-222222222222'),
   315, 'apply_run leaves score unchanged after finish');
+
+-- ---------------------------------------------------------------------------
+-- parties select policy: private parties only for host and members
+-- PRIV01 hosted by u3 (deliberately not a member row), u2 a member, u4 an outsider.
+-- ---------------------------------------------------------------------------
+insert into public.parties (id, code, name, host_id, visibility, status, max_participants) values
+  ('aaaaaaaa-0000-0000-0000-000000000009', 'PRIV01', 'Private crew', '33333333-3333-3333-3333-333333333333', 'private', 'lobby', 8);
+insert into public.party_members (party_id, user_id) values
+  ('aaaaaaaa-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
+select ok(not exists (select 1 from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000009'),
+  'non-member cannot select a private party');
+select ok(not exists (select 1 from public.parties where code = 'PRIV01'),
+  'non-member cannot see a private party code');
+select ok(exists (select 1 from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000003'),
+  'signed-in user sees a public party');
+
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+select is((select code from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000009'), 'PRIV01',
+  'member sees a private party and its code');
+
+select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
+select is((select code from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000009'), 'PRIV01',
+  'host sees a private party');
+
+select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
+select is((public.join_party('priv01')).code, 'PRIV01', 'non-member joins a private party by code');
+select ok(exists (select 1 from public.parties where id = 'aaaaaaaa-0000-0000-0000-000000000009'),
+  'private party is visible after joining');
 
 select * from finish();
 rollback;

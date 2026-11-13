@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   createParty,
@@ -56,6 +56,9 @@ export const useLeaveParty = () => usePartyMutation(leaveParty, true);
 /** Live lobby/competition updates: refetch the party and its leaderboard when members or the party row change. */
 export function usePartyRealtime(partyId?: string) {
   const queryClient = useQueryClient();
+  // realtime-js reuses a channel with the same topic, and removeChannel is async: a fixed topic
+  // lets the next screen subscribe to the channel the previous one is tearing down.
+  const mountId = useId();
   useEffect(() => {
     if (!supabase || !partyId) return;
     const refresh = () => {
@@ -63,12 +66,12 @@ export function usePartyRealtime(partyId?: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.partyLeaderboard(partyId) });
     };
     const channel = supabase
-      .channel(`party:${partyId}`)
+      .channel(`party:${partyId}:${mountId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'party_members', filter: `party_id=eq.${partyId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'parties', filter: `id=eq.${partyId}` }, refresh)
       .subscribe();
     return () => {
       supabase?.removeChannel(channel);
     };
-  }, [partyId, queryClient]);
+  }, [partyId, queryClient, mountId]);
 }
