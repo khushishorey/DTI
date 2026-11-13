@@ -26,11 +26,24 @@ export function useParty(id: string | undefined) {
   });
 }
 
-function usePartyMutation<TArg, TResult>(fn: (arg: TArg) => Promise<TResult>) {
+// Prefixes derived from the key factories so they match every id.
+const PARTY_PREFIX = queryKeys.party('').slice(0, 1);
+const LEADERBOARD_PREFIX = queryKeys.partyLeaderboard('').slice(0, 1);
+
+function usePartyMutation<TArg, TResult>(fn: (arg: TArg) => Promise<TResult>, removeOnSuccess = false) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.parties }),
+    onSuccess: (_result, arg) => {
+      // leave_party may delete the party (host leaving a lobby): drop its cache instead of showing it stale.
+      if (removeOnSuccess && typeof arg === 'string') {
+        queryClient.removeQueries({ queryKey: queryKeys.party(arg) });
+        queryClient.removeQueries({ queryKey: queryKeys.partyLeaderboard(arg) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.parties });
+      queryClient.invalidateQueries({ queryKey: PARTY_PREFIX });
+      queryClient.invalidateQueries({ queryKey: LEADERBOARD_PREFIX });
+    },
   });
 }
 
@@ -38,7 +51,7 @@ export const useCreateParty = () => usePartyMutation(createParty);
 export const useJoinParty = () => usePartyMutation(joinPartyByCode);
 export const useStartParty = () => usePartyMutation(startParty);
 export const useFinishParty = () => usePartyMutation(finishParty);
-export const useLeaveParty = () => usePartyMutation(leaveParty);
+export const useLeaveParty = () => usePartyMutation(leaveParty, true);
 
 /** Live lobby/competition updates: refetch the party and its leaderboard when members or the party row change. */
 export function usePartyRealtime(partyId?: string) {

@@ -82,8 +82,10 @@ export async function fetchParty(id: string): Promise<Party | null> {
 async function rpcParty(fn: string, args: Record<string, unknown>): Promise<Party> {
   const { data, error } = await requireSupabase().rpc(fn, args).single<PartyRow>();
   if (error) fail(error);
-  // The RPCs return the bare party row; screens refetch members via useParty.
-  return partyFromRows(data, []);
+  // The RPCs return the bare party row; re-fetch so callers get members too.
+  const party = await fetchParty(data.id);
+  if (!party) throw new Error('Party not found');
+  return party;
 }
 
 export const createParty = (input: CreatePartyInput) =>
