@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "run.io uses your location to track your run and capture territory on the map."
+        }
       ]
     ],
     "experiments": {

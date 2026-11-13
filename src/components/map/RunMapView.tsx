@@ -1,16 +1,23 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, Polyline, Region } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, Region } from 'react-native-maps';
+import { cellPolygon } from '../../lib/h3';
 import { Coordinates } from '../../types/territory';
 import { Colors, Radius } from '../../constants/theme';
 import { DARK_MAP_STYLE } from './MapHomeView';
 
 interface RunMapViewProps {
   route: Coordinates[];
+  /** H3 cells captured so far, drawn as hexes under the route. */
+  capturedCells?: string[];
   followCurrentLocation?: boolean;
 }
 
-export function RunMapView({ route, followCurrentLocation = false }: RunMapViewProps) {
+export function RunMapView({ route, capturedCells = [], followCurrentLocation = false }: RunMapViewProps) {
+  const hexes = useMemo(
+    () => capturedCells.map((cell) => ({ cell, coordinates: cellPolygon(cell) })),
+    [capturedCells],
+  );
   const region = useMemo<Region>(() => {
     const points = route.length > 0 ? route : [{ latitude: 37.78825, longitude: -122.4324 }];
     if (followCurrentLocation) {
@@ -51,8 +58,17 @@ export function RunMapView({ route, followCurrentLocation = false }: RunMapViewP
       toolbarEnabled={false}
       rotateEnabled={false}
       pitchEnabled={false}
-      accessibilityLabel="Simulated running route map"
+      accessibilityLabel="Running route map"
     >
+      {hexes.map(({ cell, coordinates }) => (
+        <Polygon
+          key={cell}
+          coordinates={coordinates}
+          fillColor="rgba(183, 243, 74, 0.18)"
+          strokeColor={Colors.primary}
+          strokeWidth={1.5}
+        />
+      ))}
       {route.length > 1 ? (
         <>
           <Polyline coordinates={route} strokeColor="rgba(183, 243, 74, 0.22)" strokeWidth={10} />

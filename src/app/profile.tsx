@@ -11,6 +11,9 @@ import { Icon } from '../components/common/Icon';
 import { ThemedText } from '../components/common/ThemedText';
 import { MOCK_ACHIEVEMENTS, MOCK_PROFILE, MOCK_RECENT_ACTIVITIES } from '../data/mockProfile';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { Button } from '../components/common/Button';
+import { signOut } from '../services/auth';
+import { useAuthStore } from '../stores/useAuthStore';
 
 const ACHIEVEMENT_ICONS = {
   footprints: Footprints,
@@ -23,7 +26,12 @@ const ACHIEVEMENT_ICONS = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const profile = MOCK_PROFILE;
+  const account = useAuthStore((state) => state.profile);
+  // Name, colour and level are real once signed in; career stats stay mock until week 2.
+  const profile = account
+    ? { ...MOCK_PROFILE, username: account.username, level: account.level }
+    : MOCK_PROFILE;
+  const accentColor = account?.color ?? Colors.primary;
   const unlockedCount = MOCK_ACHIEVEMENTS.filter((achievement) => achievement.unlocked).length;
 
   return (
@@ -46,7 +54,7 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.profileHeroRow}>
             <View style={styles.avatarFrame}>
-              <Avatar name={profile.username} size={76} borderColor={Colors.primary} borderWidth={2} />
+              <Avatar name={profile.username} size={76} borderColor={accentColor} borderWidth={2} />
               <View style={styles.levelBadge}><ThemedText style={styles.levelBadgeText}>{profile.level}</ThemedText></View>
             </View>
             <View style={styles.profileCopy}>
@@ -125,6 +133,15 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
+        {account ? (
+          <Button
+            title="LOG OUT"
+            variant="ghost"
+            fullWidth
+            onPress={() => void signOut()}
+            style={styles.signOut}
+          />
+        ) : null}
       </ScrollView>
 
       <AppBottomNavigation activeTab="profile" />
@@ -133,6 +150,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  signOut: { marginTop: Spacing.xl },
   screen: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: Spacing.lg },
   pageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },

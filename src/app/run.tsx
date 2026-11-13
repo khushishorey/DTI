@@ -8,38 +8,25 @@ import { Icon } from '../components/common/Icon';
 import { Modal } from '../components/common/Modal';
 import { ThemedText } from '../components/common/ThemedText';
 import { RunMapView } from '../components/map/RunMapView';
-import { SIMULATED_RUN_ROUTE } from '../data/mockRunRoute';
 import { Colors, Radius, Spacing, Typography } from '../constants/theme';
+import { useRunTracker } from '../hooks/useRunTracker';
+import { MIN_POINTS_TO_CAPTURE, cellsAreaKm2 } from '../lib/h3';
 import { useRunStore } from '../stores/useRunStore';
+import { formatArea } from '../utils/formatters';
 
 export default function RunScreen() {
   const insets = useSafeAreaInsets();
   const session = useRunStore((state) => state.currentSession);
   const status = useRunStore((state) => state.status);
-  const tick = useRunStore((state) => state.tick);
   const pauseRun = useRunStore((state) => state.pauseRun);
   const resumeRun = useRunStore((state) => state.resumeRun);
   const endRun = useRunStore((state) => state.endRun);
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
+  const { error: trackingError } = useRunTracker();
 
   useEffect(() => {
-    if (!session) {
-      router.replace('/');
-      return;
-    }
-    if (status !== 'running') return;
-
-    const timer = setInterval(() => {
-      const elapsed = useRunStore.getState().currentSession?.durationSeconds ?? 0;
-      const nextElapsed = elapsed + 1;
-      const routePoint = nextElapsed % 5 === 0
-        ? SIMULATED_RUN_ROUTE[Math.min(Math.floor(nextElapsed / 5), SIMULATED_RUN_ROUTE.length - 1)]
-        : undefined;
-      tick(routePoint);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [session?.id, status, tick]);
+    if (!session) router.replace('/');
+  }, [session]);
 
   if (!session) {
     return (
@@ -50,6 +37,18 @@ export default function RunScreen() {
   }
 
   const isPaused = status === 'paused';
+  const isSimulated = session.trackingMode === 'simulated';
+  const currentCellPoints = session.currentCell ? session.cellPointCounts[session.currentCell] ?? 0 : 0;
+  const currentCellCaptured = currentCellPoints >= MIN_POINTS_TO_CAPTURE;
+  const captureProgress = Math.min(currentCellPoints / MIN_POINTS_TO_CAPTURE, 1);
+  const capturedCount = session.capturedCells.length;
+  const captureTitle = trackingError
+    ? trackingError === 'permission-denied'
+      ? 'Location permission needed'
+      : 'GPS unavailable'
+    : !session.currentCell
+      ? 'Waiting for GPS…'
+      : `${capturedCount} ${capturedCount === 1 ? 'cell' : 'cells'} · ${formatArea(cellsAreaKm2(session.capturedCells))}`;
 
   const finishRun = () => {
     setShowEndConfirmation(false);
@@ -59,7 +58,7 @@ export default function RunScreen() {
 
   return (
     <View style={styles.screen}>
-      <RunMapView route={session.route} followCurrentLocation />
+      <RunMapView route={session.route} capturedCells={session.capturedCells} followCurrentLocation />
 
       <View style={[styles.topHud, { top: insets.top + Spacing.md }]} pointerEvents="box-none">
         <View style={styles.runStateRow}>
@@ -69,7 +68,7 @@ export default function RunScreen() {
           </View>
           <View style={styles.gpsIndicator}>
             <Icon icon={Radio} size={13} color={Colors.primary} strokeWidth={2.2} />
-            <ThemedText style={styles.gpsText}>GPS SIMULATION</ThemedText>
+            <ThemedText style={styles.gpsText}>{isSimulated ? 'GPS SIMULATION' : 'GPS LIVE'}</ThemedText>
           </View>
         </View>
 
@@ -90,13 +89,15 @@ export default function RunScreen() {
             <View style={styles.captureIcon} />
           </View>
           <View style={styles.captureCopy}>
-            <ThemedText style={styles.captureLabel}>TERRITORY IN RANGE</ThemedText>
-            <ThemedText style={styles.captureName}>Sector Alpha</ThemedText>
+            <ThemedText style={styles.captureLabel}>TERRITORY CAPTURED THIS RUN</ThemedText>
+            <ThemedText style={styles.captureName}>{captureTitle}</ThemedText>
           </View>
           <View style={styles.captureProgressWrap}>
-            <ThemedText style={styles.capturePercent}>CAPTURING</ThemedText>
+            <ThemedText style={styles.capturePercent}>
+              {currentCellCaptured ? 'CELL CLAIMED' : 'CAPTURING'}
+            </ThemedText>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.min(16 + session.durationSeconds * 0.7, 92)}%` }]} />
+              <View style={[styles.progressFill, { width: `${Math.round(captureProgress * 100)}%` }]} />
             </View>
           </View>
         </View>
@@ -108,7 +109,7 @@ export default function RunScreen() {
             size="lg"
             leftIcon={<Icon icon={isPaused ? Play : Pause} size={18} color={Colors.primary} strokeWidth={2.7} />}
             onPress={isPaused ? resumeRun : pauseRun}
-            accessibilityHint={isPaused ? 'Resume your simulated run' : 'Pause your simulated run'}
+            accessibilityHint={isPaused ? 'Resume your run' : 'Pause your run'}
             style={styles.pauseButton}
           />
           <Button

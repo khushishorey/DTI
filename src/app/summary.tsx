@@ -45,7 +45,7 @@ export default function RunSummaryScreen() {
         </View>
 
         <View style={styles.mapCard}>
-          <RunMapView route={session.route} />
+          <RunMapView route={session.route} capturedCells={session.capturedCells} />
           <View style={styles.routeTag}>
             <View style={styles.routeDot} />
             <ThemedText style={styles.routeTagText}>YOUR ROUTE</ThemedText>
@@ -90,7 +90,9 @@ export default function RunSummaryScreen() {
           </View>
           <View style={styles.territoryCopy}>
             <ThemedText style={styles.territoryEyebrow}>TERRITORY CAPTURED</ThemedText>
-            <ThemedText style={styles.territoryName}>Sector Alpha</ThemedText>
+            <ThemedText style={styles.territoryName}>
+              {session.territoriesClaimedCount} hex {session.territoriesClaimedCount === 1 ? 'cell' : 'cells'}
+            </ThemedText>
           </View>
           <ThemedText style={styles.territoryArea}>+{session.territoryCapturedKm2.toFixed(3)} km²</ThemedText>
         </Card>

@@ -153,7 +153,7 @@ export default function Index() {
               router.push('/run');
             }
           }}
-          accessibilityHint="Starts a simulated run session"
+          accessibilityHint="Starts a run session"
           style={styles.startButton}
         />
         <ThemedText style={styles.runCaption}>EVERY RUN COUNTS. EVERY TERRITORY MATTERS.</ThemedText>

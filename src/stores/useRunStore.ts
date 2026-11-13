@@ -1,25 +1,34 @@
 import { create } from 'zustand';
-import { RunSession, RunStatus } from '../types/run';
-import { Coordinates } from '../types/territory';
-import { RUN_START } from '../data/mockRunRoute';
+import { haversineMeters } from '../lib/geo';
+import { MIN_POINTS_TO_CAPTURE, cellsAreaKm2, pointToCell } from '../lib/h3';
+import { rejectReason, TrackPoint } from '../lib/tracking/filterPoints';
+import { defaultTrackingMode, TrackingMode } from '../lib/tracking/sources';
+import { PaceSample, RunSession, RunStatus } from '../types/run';
+
+/** Pace is averaged over this trailing window so a single GPS wobble doesn't swing it. */
+const PACE_WINDOW_MS = 30_000;
+/** Below this distance in the window the pace is too noisy to show. */
+const MIN_PACE_WINDOW_METERS = 15;
 
 interface RunState {
   currentSession: RunSession | null;
   status: RunStatus;
-  startRun: () => void;
+  /** Starts a run; tracking defaults to real GPS on phones and the simulator on web. */
+  startRun: (trackingMode?: TrackingMode) => void;
   pauseRun: () => void;
   resumeRun: () => void;
   endRun: () => void;
-  addRoutePoint: (point: Coordinates) => void;
-  updateStats: (distanceMeters: number, paceSecondsPerKm: number) => void;
-  tick: (routePoint?: Coordinates) => void;
+  /** Feed one raw GPS reading; it is filtered, then distance, pace and cells are updated. */
+  addTrackPoint: (point: TrackPoint) => void;
+  /** Advance the run clock by one second (only while running). */
+  tick: () => void;
 }
 
 export const useRunStore = create<RunState>((set) => ({
   currentSession: null,
   status: 'idle',
 
-  startRun: () =>
+  startRun: (trackingMode = defaultTrackingMode()) =>
     set({
       status: 'running',
       currentSession: {
@@ -28,7 +37,14 @@ export const useRunStore = create<RunState>((set) => ({
         durationSeconds: 0,
         distanceMeters: 0,
         currentPaceSecondsPerKm: 0,
-        route: [RUN_START],
+        route: [],
+        trackPoints: [],
+        rejectedPointCount: 0,
+        cellPointCounts: {},
+        capturedCells: [],
+        paceWindow: [],
+        startsNewSegment: true,
+        trackingMode,
         territoriesClaimedCount: 0,
         territoryCapturedKm2: 0,
         xpEarned: 0,
@@ -40,79 +56,98 @@ export const useRunStore = create<RunState>((set) => ({
   pauseRun: () =>
     set((state) => ({
       status: 'paused',
-      currentSession: state.currentSession
-        ? { ...state.currentSession, status: 'paused' }
-        : null,
+      currentSession: state.currentSession ? { ...state.currentSession, status: 'paused' } : null,
     })),
 
   resumeRun: () =>
     set((state) => ({
       status: 'running',
+      // Start a new segment so the pause gap isn't counted as distance or read as a teleport.
       currentSession: state.currentSession
-        ? { ...state.currentSession, status: 'running' }
+        ? { ...state.currentSession, status: 'running', paceWindow: [], startsNewSegment: true }
         : null,
     })),
 
   endRun: () =>
-    set((state) => ({
-      status: 'finished',
-      currentSession: state.currentSession
-        ? {
-            ...state.currentSession,
-            endTime: Date.now(),
-            territoryCapturedKm2: Math.max(0.006, state.currentSession.distanceMeters / 25000),
-            territoriesClaimedCount: 1,
-            xpEarned:
-              50 +
-              Math.floor(state.currentSession.distanceMeters / 100) +
-              Math.floor(state.currentSession.durationSeconds / 60) * 10,
-            status: 'finished',
-          }
-        : null,
-    })),
-
-  addRoutePoint: (point) =>
     set((state) => {
-      if (!state.currentSession) return state;
+      const session = state.currentSession;
+      if (!session) return state;
       return {
+        status: 'finished',
         currentSession: {
-          ...state.currentSession,
-          route: [...state.currentSession.route, point],
+          ...session,
+          endTime: Date.now(),
+          territoriesClaimedCount: session.capturedCells.length,
+          territoryCapturedKm2: cellsAreaKm2(session.capturedCells),
+          // Provisional: the server will recompute XP in submit_run (week 2).
+          xpEarned:
+            50 +
+            Math.floor(session.distanceMeters / 100) +
+            Math.floor(session.durationSeconds / 60) * 10 +
+            session.capturedCells.length * 5,
+          status: 'finished',
         },
       };
     }),
 
-  updateStats: (distanceMeters, paceSecondsPerKm) =>
+  addTrackPoint: (point) =>
     set((state) => {
-      if (!state.currentSession) return state;
+      const session = state.currentSession;
+      if (state.status !== 'running' || !session) return state;
+
+      // The first point of a segment (run start or after resume) has nothing to compare against.
+      const previous = session.startsNewSegment ? undefined : session.trackPoints.at(-1);
+      if (rejectReason(previous, point)) {
+        return { currentSession: { ...session, rejectedPointCount: session.rejectedPointCount + 1 } };
+      }
+
+      const distanceMeters = session.distanceMeters + (previous ? haversineMeters(previous, point) : 0);
+
+      const cell = pointToCell(point);
+      const count = (session.cellPointCounts[cell] ?? 0) + 1;
+      const capturedCells =
+        count === MIN_POINTS_TO_CAPTURE ? [...session.capturedCells, cell] : session.capturedCells;
+
+      const paceWindow: PaceSample[] = [
+        ...session.paceWindow.filter((s) => point.timestamp - s.timestamp <= PACE_WINDOW_MS),
+        { timestamp: point.timestamp, distanceMeters },
+      ];
+
       return {
         currentSession: {
-          ...state.currentSession,
+          ...session,
           distanceMeters,
-          currentPaceSecondsPerKm: paceSecondsPerKm,
-        },
-      };
-    }),
-
-  tick: (routePoint) =>
-    set((state) => {
-      if (state.status !== 'running' || !state.currentSession) return state;
-      const durationSeconds = state.currentSession.durationSeconds + 1;
-      const paceSecondsPerKm = 430;
-      const distanceMeters = (durationSeconds / paceSecondsPerKm) * 1000;
-      const route = routePoint
-        ? [...state.currentSession.route, routePoint]
-        : state.currentSession.route;
-
-      return {
-        currentSession: {
-          ...state.currentSession,
-          durationSeconds,
-          distanceMeters,
-          currentPaceSecondsPerKm: paceSecondsPerKm,
-          route,
+          currentPaceSecondsPerKm: rollingPace(paceWindow) ?? session.currentPaceSecondsPerKm,
+          route: [...session.route, { latitude: point.latitude, longitude: point.longitude }],
+          trackPoints: [...session.trackPoints, point],
+          cellPointCounts: { ...session.cellPointCounts, [cell]: count },
+          capturedCells,
+          currentCell: cell,
+          paceWindow,
+          startsNewSegment: false,
           caloriesBurned: Math.round(distanceMeters * 0.06),
         },
       };
     }),
+
+  tick: () =>
+    set((state) => {
+      if (state.status !== 'running' || !state.currentSession) return state;
+      return {
+        currentSession: {
+          ...state.currentSession,
+          durationSeconds: state.currentSession.durationSeconds + 1,
+        },
+      };
+    }),
 }));
+
+function rollingPace(window: PaceSample[]): number | null {
+  if (window.length < 2) return null;
+  const first = window[0];
+  const last = window[window.length - 1];
+  const meters = last.distanceMeters - first.distanceMeters;
+  const seconds = (last.timestamp - first.timestamp) / 1000;
+  if (meters < MIN_PACE_WINDOW_METERS || seconds <= 0) return null;
+  return seconds / (meters / 1000);
+}
