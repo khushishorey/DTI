@@ -16,7 +16,7 @@ Press `w` for web, or scan the QR code with a development build. Without Supabas
 ## Connect the backend (Supabase)
 
 1. Create a free project at supabase.com.
-2. Copy `.env.example` to `.env` and fill in `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (Project Settings → API).
+2. Copy `.env.example` to `.env` and fill it in (local dev). For EAS builds `.env` is gitignored and invisible to EAS, so run `npx eas-cli@latest env:create` for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (visibility `plaintext` or `sensitive`) and `GOOGLE_MAPS_ANDROID_API_KEY` (visibility `secret`).
 3. Apply the schema:
    ```bash
    npx supabase login
