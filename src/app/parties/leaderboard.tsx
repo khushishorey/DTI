@@ -13,13 +13,11 @@ import { ThemedText } from '../../components/common/ThemedText';
 import { Colors, Radius, Spacing, Typography } from '../../constants/theme';
 import { useFinishParty, useParty, usePartyRealtime } from '../../hooks/useParties';
 import { usePartyLeaderboard } from '../../hooks/useServerData';
+import { nextFinishRetry, PARTY_NOT_ENDED } from '../../lib/partyFinish';
 import { partyRoute, partyStandings } from '../../services/parties';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { usePartyStore } from '../../stores/usePartyStore';
 import { gameModeLabel } from '../../components/party/PartyCard';
-
-/** Our clock can run ahead of the server's; wait this long before asking again. */
-const NOT_ENDED_RETRY_MS = 3000;
 
 export default function PartyLeaderboardScreen() {
   const offline = useAuthStore((state) => state.status === 'offline');
@@ -29,7 +27,10 @@ export default function PartyLeaderboardScreen() {
   const party = partyQuery.data;
   const leaderboard = usePartyLeaderboard(partyId);
   const finishParty = useFinishParty();
-  const finishRequested = useRef(false);
+  const finishRequested = useRef(false); // one finish_party call in flight at a time
+  const failures = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [gaveUp, setGaveUp] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [error, setError] = useState('');
@@ -45,28 +46,47 @@ export default function PartyLeaderboardScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const finishCompetition = async () => {
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
+
+  // `auto`: called because time is up. Failures then retry with a delay (see nextFinishRetry);
+  // a manual host END just reports its error.
+  const finishCompetition = async (auto: boolean) => {
     if (!party || finishRequested.current) return;
     finishRequested.current = true;
     setError('');
     try {
       await finishParty.mutateAsync(party.id); // invalidates the party; the status effect routes to results
+      failures.current = 0;
     } catch (finishError) {
       const message = finishError instanceof Error ? finishError.message : 'Could not end the competition.';
-      if (message === 'Party has not ended yet') {
-        setTimeout(() => { finishRequested.current = false; }, NOT_ENDED_RETRY_MS);
-      } else {
+      if (!auto) {
         finishRequested.current = false;
         setError(message);
+        return;
+      }
+      if (message !== PARTY_NOT_ENDED) failures.current += 1;
+      const { delayMs, giveUp } = nextFinishRetry(failures.current, message);
+      if (giveUp) {
+        finishRequested.current = false;
+        setError(message);
+        setGaveUp(true);
+      } else {
+        // Releasing the guard lets the once-a-second effect below try again.
+        retryTimer.current = setTimeout(() => { finishRequested.current = false; }, delayMs);
       }
     }
   };
 
+  const retryFinish = () => {
+    failures.current = 0;
+    setGaveUp(false);
+  };
+
   const timeIsUp = party?.status === 'in_progress' && party.endsAt !== undefined && party.endsAt <= now;
   useEffect(() => {
-    if (timeIsUp && !error) void finishCompetition();
-    // finishCompetition is guarded by finishRequested; `now` re-runs this after a retry delay.
-  }, [timeIsUp, now, error]);
+    // Stops on its own once the party is completed (timeIsUp turns false) or after giving up.
+    if (timeIsUp && !gaveUp) void finishCompetition(true);
+  }, [timeIsUp, now, gaveUp]);
 
   if (!party) {
     return (
@@ -126,6 +146,7 @@ export default function PartyLeaderboardScreen() {
       </View>
 
       {error ? <ThemedText style={styles.errorText} accessibilityRole="alert">{error}</ThemedText> : null}
+      {gaveUp ? <Button title="RETRY" variant="secondary" onPress={retryFinish} style={styles.endButton} /> : null}
 
       {isLeader ? (
         <Button title="END COMPETITION" variant="destructive" loading={finishParty.isPending} onPress={() => setConfirmFinish(true)} style={styles.endButton} />
@@ -137,7 +158,7 @@ export default function PartyLeaderboardScreen() {
         title="End the competition?"
         description="The current standings will be saved and everyone will see the results."
         dismissOnBackdrop={false}
-        primaryAction={{ label: 'End competition', variant: 'destructive', onPress: () => { setConfirmFinish(false); void finishCompetition(); } }}
+        primaryAction={{ label: 'End competition', variant: 'destructive', onPress: () => { setConfirmFinish(false); void finishCompetition(false); } }}
         secondaryAction={{ label: 'Keep playing', onPress: () => setConfirmFinish(false) }}
       />
     </PartyPage>
