@@ -2,7 +2,7 @@
 
 A running game where your runs capture territory. Run through hex cells on a real map to claim them, steal rivals' cells, and compete in timed party challenges.
 
-Built with Expo (React Native + TypeScript), Expo Router, Zustand, MapLibre (free OpenFreeMap tiles, no API key), H3 and Supabase. See [ROADMAP.md](ROADMAP.md) for the plan and [design.md](design.md) for the design system.
+Built with Expo (React Native + TypeScript), Expo Router, Zustand, MapLibre (free OpenFreeMap tiles, no API key), H3 and Supabase. See [docs/STATUS.md](docs/STATUS.md) for what is done and what is left, [ROADMAP.md](ROADMAP.md) for the plan and [design.md](design.md) for the design system.
 
 ## Quick start (no backend needed)
 
