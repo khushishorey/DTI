@@ -66,8 +66,8 @@ const deviceSource: TrackingSource = {
   },
 };
 
-/** Jogs along SIMULATED_RUN_ROUTE at a steady 7:10 /km, emitting one point per second. */
-const SIMULATED_SPEED_MPS = 1000 / 430;
+/** Jogs along SIMULATED_RUN_ROUTE at a steady ~5:00 /km (~3.28 m/s), completing the 262m demo route in ~80s. */
+const SIMULATED_SPEED_MPS = 262 / 80;
 
 function createSimulatedSource(): TrackingSource {
   // Distance already covered survives pause/resume because the source object is reused.
