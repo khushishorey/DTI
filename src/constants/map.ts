@@ -12,10 +12,10 @@ export interface MapRegion {
  * (src/data/mockRunRoute.ts) and the seeded players (supabase/seed.sql).
  */
 export const DEMO_REGION: MapRegion = {
-  latitude: 37.7874,
-  longitude: -122.4315,
-  latitudeDelta: 0.012,
-  longitudeDelta: 0.01,
+  latitude: 25.4305,
+  longitude: 81.7720,
+  latitudeDelta: 0.007,
+  longitudeDelta: 0.007,
 };
 
 export function regionToBounds(region: MapRegion): Bounds {
